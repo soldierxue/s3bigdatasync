@@ -1,6 +1,6 @@
 
 # Modules:
-* Module 0 – Leo (Done): ListProducer/
+## Module 0 – Leo (Done): ListProducer/
     Generate Bucket Objects List
     Input:
         Bucket
@@ -8,7 +8,7 @@
     Output: 
         Object List(json)
 
-* Module I - Jason: TaskProducer/
+## Module I - Jason: TaskProducer/
     Generate Tasks
     Input:
         Json Object List
@@ -19,7 +19,7 @@
         Estimated Cost
         DryRun
 
-* Module II - Leo: TaskExecutor/
+## Module II - Leo: TaskExecutor/
     Execute Tasks
     Input:
         Job Queues
@@ -27,7 +27,7 @@
         Job Status
         Estimated Cost
 
-* Module III - Leo: TaskMonitor/
+## Module III - Leo: TaskMonitor/
     Monitor Task Progress
     Input:
         Jobs / Jobs Status
@@ -35,7 +35,7 @@
         Stat
         Jobs Status
 
-* Module IV - Jason: ObjectVerification/
+## Module IV - Jason: ObjectVerification/
     Source/Dest Verification
     Input:
         Source Object List
@@ -43,7 +43,7 @@
     Output:
         Object List(Format)
 
-* Module V - David: UICenter/
+## Module V - David: UICenter/
     UI
     Input:
         Data
