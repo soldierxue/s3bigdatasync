@@ -1,0 +1,44 @@
+
+Object Data Schema:
+{
+    “TotalSizeMB”: 1000,
+        “TotalCount”: 10384,
+        “Bucket”: “bname”
+            [
+            {
+                "LastModified": "2016-06-22T09:54:26.000Z",
+                "ETag": "\"6e8c28243c55edd44cc8a796a332f1c2\"",
+                "StorageClass": "STANDARD",
+                "Key": "qwikLabs/屏幕快照 2016-03-17 下午4.24.34.png",
+                "Size": 85697,
+                "IsMultipartUploaded":True|False,
+                "ReplicationStatus":""
+            }
+            ]
+}
+
+Objects Mainfest:
+manifest.json:
+{
+    "sourceBucket" : "bjslabs",
+        "destinationBucket" : "arn:aws-cn:s3:::s3inventory",
+        "version" : "2016-11-30",
+        "statistics" : {
+            "totalObjects" : 2294893,
+            "totalObjectsSub1GB" : 233,
+            "totalObjectsSub5GB" : 233,
+            "totalObjectsSub10GB" : 233,
+            "totalObjectsSub50GB" : 233,
+            "totalObjectsSub100GB" : 233,
+            "totalObjectsSub1TB" : 233,
+            "totalObjectsSub5TB" : 233,
+            "totalObjectsSizeGB" : 23232
+        },
+        "fileFormat" : "json",
+        "objSchema" : "Key, Size, LastModified, ETag, StorageClass, IsMultipartUploaded, ReplicationStatus",
+        "files" : [ {
+            "key" : "bjslabs/bjslabs_inventory/data/5eacbbf9-a3ac-441a-8e7c-3ab2e5d2c0fd.json",
+            "size" : 5501076,
+            "MD5checksum" : "d1ddc5cd1f122b238122fff93b355d08"
+        } ]
+}
