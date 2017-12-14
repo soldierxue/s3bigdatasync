@@ -52,7 +52,7 @@ Monitor Item Schema :
                 "Key": "qwikLabs/屏幕快照 2016-03-17 下午4.24.34.png",
                 "Size": 85697,
                 "IsMultipartUploaded":True|False,
-                "ReplicationStatus":"", 
+                "ReplicationStatus":0|1, 
                 ####
                 0 - Failed Transferred
                 1 - Success Transferred
