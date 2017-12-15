@@ -98,3 +98,15 @@ a:hover {
     margin-right: 10px;
 }
 
+.release-note-item-list dt {
+    font-size: 18px;
+}
+
+.release-note-item-list dd {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.release-note-item-list dd ul {
+    margin-bottom: 0;
+}
