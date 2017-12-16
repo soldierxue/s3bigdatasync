@@ -60,3 +60,19 @@ Monitor Item Schema :
                 "ReplicationTime" : "2017-06-12T09:34:34.000Z"
                                                                                                                             
 }
+
+Monitor Timeset Schema :
+
+{
+	"Timeset": "",
+	###
+	2016-06-22T09:54 - Minute
+	2016-06-22T09 - Hour
+	SourceAll - Source Bucket situation Until Now.
+	TargetAll - Target Bucket situation Until Now.
+	###
+	"Size": 85679,
+	"Objects": 856,
+	"FailureSize": 867,	### Only Minute and Hour Timeset
+	"FailureObjects": 23	### Only Minute and Hour Timeset
+}
