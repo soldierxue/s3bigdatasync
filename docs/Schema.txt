@@ -76,3 +76,13 @@ Monitor Timeset Schema :
 	"FailureSize": 867,	### Only Minute and Hour Timeset
 	"FailureObjects": 23	### Only Minute and Hour Timeset
 }
+
+Updated To following:
+{
+    "StartTime": 343545465,
+    "Unit": 1|60 #Minutes
+    "FailedObjectSize":34343 # KBytes
+    "FailedObjectNum": 34343
+    "SuccessObjectSize":34343 # KBytes
+    "SuccessObjectNum": 34343    
+}
