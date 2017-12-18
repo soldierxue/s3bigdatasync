@@ -81,8 +81,8 @@ Updated To following:
 {
     "StartTime": 343545465,
     "Unit": 1|60 #Minutes
-    "FailedObjectSize":34343 # KBytes
+    "FailedObjectSize":34343 # Bytes
     "FailedObjectNum": 34343
-    "SuccessObjectSize":34343 # KBytes
+    "SuccessObjectSize":34343 # Bytes
     "SuccessObjectNum": 34343    
 }
