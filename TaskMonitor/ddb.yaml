@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata: 
+  License: Apache-2.0
+Description: 'AWS CloudFormation Sample Template DynamoDB_Table: This template demonstrates
+  the creation of a DynamoDB table.  **WARNING** This template creates an Amazon DynamoDB
+  table. You will be billed for the AWS resources used if you create a stack from
+  this template.'
+Parameters:
+  MonitorTableName:
+    Description: Name of the table
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9\_\.]*'
+    Default: 's3cross_monitor'
+    MinLength: '3'
+    MaxLength: '255'
+    ConstraintDescription: must contain only alphanumberic characters   
+  StatTableName:
+    Description: Name of the s3 monitor stats table
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9\_\.]*'
+    Default: 's3cross_stat'
+    MinLength: '3'
+    MaxLength: '255'
+    ConstraintDescription: must contain only alphanumberic characters       
+  ReadCapacityUnits:
+    Description: Provisioned read throughput
+    Type: Number
+    Default: '100'
+    MinValue: '100'
+    MaxValue: '10000'
+    ConstraintDescription: must be between 5 and 10000
+  WriteCapacityUnits:
+    Description: Provisioned write throughput
+    Type: Number
+    Default: '100'
+    MinValue: '100'
+    MaxValue: '10000'
+    ConstraintDescription: must be between 5 and 10000
+Resources:
+  myDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "ObjectKey"
+        AttributeType: "S"
+      - AttributeName: "ReplicationTime"
+        AttributeType: "N"
+      - AttributeName: "ReplicationStatus"
+        AttributeType: "N"        
+      KeySchema:
+      - AttributeName: "ObjectKey"
+        KeyType: HASH
+      - AttributeName: "ReplicationTime"
+        KeyType: RANGE           
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref 'ReadCapacityUnits'
+        WriteCapacityUnits: !Ref 'WriteCapacityUnits'
+      TableName: !Ref 'MonitorTableName' 
+      GlobalSecondaryIndexes:
+      - IndexName: "gsiStatus"
+        KeySchema:
+        - AttributeName: "ReplicationStatus"
+          KeyType: HASH
+        - AttributeName: "ObjectKey"
+          KeyType: RANGE       
+        Projection:
+          ProjectionType: "KEYS_ONLY"
+        ProvisionedThroughput:
+          ReadCapacityUnits: !Ref 'ReadCapacityUnits'
+          WriteCapacityUnits: !Ref 'WriteCapacityUnits'
+
+  statDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "Unit"
+        AttributeType: "N"
+      - AttributeName: "StartTime"
+        AttributeType: "N"
+      # - AttributeName: "FailedObjectSize"
+      #   AttributeType: "N"    
+      # - AttributeName: "FailedObjectNum"
+      #   AttributeType: "N"  
+      # - AttributeName: "SuccessObjectSize"
+      #   AttributeType: "N"  
+      # - AttributeName: "SuccessObjectNum"
+      #   AttributeType: "N"                              
+      KeySchema:
+      - AttributeName: "Unit"
+        KeyType: HASH
+      - AttributeName: "StartTime"
+        KeyType: RANGE           
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref 'ReadCapacityUnits'
+        WriteCapacityUnits: !Ref 'WriteCapacityUnits'
+      TableName: !Ref 'StatTableName'
+          
+  WriteCapacityScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'WriteCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:table:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'ReadCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:table:ReadCapacityUnits
+      ServiceNamespace: dynamodb      
+  ScalingRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - application-autoscaling.amazonaws.com.cn
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "root"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:UpdateTable"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:SetAlarmState"
+                  - "cloudwatch:DeleteAlarms"
+                Resource: "*"      
+  WriteScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  ReadScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization             
+      
+Outputs:
+  TableName:
+    Value: !Ref 'myDynamoDBTable'
+    Description: Table name of the newly created DynamoDB table
