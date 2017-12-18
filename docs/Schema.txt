@@ -57,7 +57,7 @@ Monitor Item Schema :
                 0 - Failed Transferred
                 1 - Success Transferred
                 ####
-                "ReplicationTime" : "2017-06-12T09:34:34.000Z"
+                "ReplicationTime" : 1513601632.97 #相对于1970的秒数 time.time()
                                                                                                                             
 }
 

@@ -60,11 +60,13 @@ Resources:
       - IndexName: "gsiStatus"
         KeySchema:
         - AttributeName: "ReplicationStatus"
-          KeyType: HASH
-        - AttributeName: "ObjectKey"
-          KeyType: RANGE       
+          KeyType: HASH    
         Projection:
-          ProjectionType: "KEYS_ONLY"
+          ProjectionType: "INCLUDE"
+          NonKeyAttributes:
+          - "ReplicationTime"
+          - "ObjectKey"
+          - "Size"  
         ProvisionedThroughput:
           ReadCapacityUnits: !Ref 'ReadCapacityUnits'
           WriteCapacityUnits: !Ref 'WriteCapacityUnits'
