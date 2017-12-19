@@ -73,7 +73,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "Unit"
+      - AttributeName: "TimeUnit"
         AttributeType: "N"
       - AttributeName: "StartTime"
         AttributeType: "N"
