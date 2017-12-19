@@ -2,14 +2,14 @@
     TaskMonitor
 
 # 作者
-  Leo
+  Jason
 
 # 功能
     Monitor Task Progress
     Input:
-        Jobs / Jobs Status
+        Objects / Object Transfer Status
     Output:
-        Stat
-        Jobs Status
+        Object Transfer Stat
+        
 
 
