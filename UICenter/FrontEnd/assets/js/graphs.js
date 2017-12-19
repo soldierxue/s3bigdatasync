@@ -18,7 +18,8 @@ function loadTasksGraph() {
     // The y01z array has the same structure as yz, but with stacked [y₀, y₁] instead of y.
     var xz = d3.range(seriesValue),
     x00z = xz.map(function(x) { return x + ":00"; }),
-    yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
+    // yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
+    yz = getDataFromAPIEndpoint(),
     y01z = d3.stack().keys(d3.range(seriesNumber))(d3.transpose(yz)),
     yMax = d3.max(yz, function(y) { return d3.max(y); }),
     y1Max = d3.max(y01z, function(y) { return d3.max(y, function(d) { return d[1]; }); });
@@ -211,6 +212,22 @@ function loadTasksGraph() {
               .tickSize(6)
               .tickPadding(6));
     }
+}
+
+// Get Data From API Endpoint.
+function getDataFromAPIEndpoint() {
+    var obj = new XMLHttpRequest();
+    obj.open("GET", APIEndpoint + "/tasksGraph", true);
+    obj.setRequestHeader("Content-type", "application/json");
+    
+    obj.onreadystatechange = function() {
+        if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304 || obj.status == 201)) {
+            data = obj.responseText;
+            
+            return [data.successObjects, data.failureObjects]
+        }
+    };
+    obj.send(null);
 }
 
 // Just For Test.
