@@ -75,7 +75,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "Unit"
+      - AttributeName: "TimeUnit"
         AttributeType: "N"
       - AttributeName: "StartTime"
         AttributeType: "N"
@@ -88,7 +88,7 @@ Resources:
       # - AttributeName: "SuccessObjectNum"
       #   AttributeType: "N"                              
       KeySchema:
-      - AttributeName: "Unit"
+      - AttributeName: "TimeUnit"
         KeyType: HASH
       - AttributeName: "StartTime"
         KeyType: RANGE           
