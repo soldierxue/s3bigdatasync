@@ -88,7 +88,7 @@ Resources:
       # - AttributeName: "SuccessObjectNum"
       #   AttributeType: "N"                              
       KeySchema:
-      - AttributeName: "Unit"
+      - AttributeName: "TimeUnit"
         KeyType: HASH
       - AttributeName: "StartTime"
         KeyType: RANGE           
