@@ -330,5 +330,3 @@ def createTestDataToS3AndDDB():
                 }
             })
         batchWriteItemsByArray(data)
-
-returnTasksGraphData()
