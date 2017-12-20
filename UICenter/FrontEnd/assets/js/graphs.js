@@ -1,3 +1,5 @@
+var tasksGraphData = []
+
 function loadTasksGraph() {
     var tasksGraphRootG = document.getElementById("tasksGraphRootG");
     if (tasksGraphRootG != null) { tasksGraphRootG.parentNode.removeChild(tasksGraphRootG); }
@@ -18,7 +20,8 @@ function loadTasksGraph() {
     // The y01z array has the same structure as yz, but with stacked [y₀, y₁] instead of y.
     var xz = d3.range(seriesValue),
     x00z = xz.map(function(x) { return x + ":00"; }),
-    yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
+    // yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
+    yz = tasksGraphData,
     y01z = d3.stack().keys(d3.range(seriesNumber))(d3.transpose(yz)),
     yMax = d3.max(yz, function(y) { return d3.max(y); }),
     y1Max = d3.max(y01z, function(y) { return d3.max(y, function(d) { return d[1]; }); });
@@ -213,6 +216,27 @@ function loadTasksGraph() {
     }
 }
 
+// Get Data From API Endpoint.
+function getDataFromAPIEndpoint() {
+    if (window.XMLHttpRequest) {
+        var obj = new XMLHttpRequest();
+    } else if (window.ActiveXObject) {
+        var obj = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    obj.open("GET", APIEndpoint + "tasksGraph", true);
+    
+    obj.onreadystatechange = function() {
+        if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304)) {
+            data = eval("(" + obj.responseText + ")");
+            
+            tasksGraphData = [data.successObjects, data.failureObjects];
+            console.log(tasksGraphData);
+            loadTasksGraph();
+        }
+    };
+    obj.send(null);
+}
+
 // Just For Test.
 // Returns an array of seriesValue psuedorandom, smoothly-varying non-negative numbers.
 // Inspired by Lee Byron’s test data generator.
@@ -254,4 +278,4 @@ function bumps(value) {
     return values;
 }
 
-loadTasksGraph()
+getDataFromAPIEndpoint()

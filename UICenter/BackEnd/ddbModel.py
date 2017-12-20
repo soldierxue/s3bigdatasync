@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import urllib2
 import json
 import metadataModel
@@ -15,6 +16,8 @@ class dataType(Enum):
     onlyStartTime = 4
 
 IAMSecurityUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/'
+objectKeyPathPrefix = 'aws-collections/aws-collections-inventory/'
+objectKeyPathSuffix = 'T08-00Z/manifest.json'
 validColumn = ['TimeUnit', 'StartTime', 'SuccessObjectNum', 'SuccessObjectSize', 'FailedObjectNum', 'FailedObjectSize']
 dataTypeResponse = [
     'TimeUnit, StartTime, SuccessObjectNum, SuccessObjectSize, FailedObjectNum, FailedObjectSize',
@@ -26,6 +29,7 @@ dataTypeResponse = [
 projectStartTime = metadataModel.getConfigurationValue('project_start_time')
 tableName = metadataModel.getConfigurationValue('table_name')
 bucketName = metadataModel.getConfigurationValue('bucket_name')
+speedCollectDelay = metadataModel.getConfigurationValue('speed_collect_delay')
 
 # Get Temporary Certificate for service.
 def getTemporaryCertificate(service):
@@ -47,6 +51,60 @@ def getTemporaryCertificate(service):
         aws_session_token = awsToken
     )
 
+# Get manifest data from S3 bucket.
+# Input:    Request value [].
+# Output:   Response Dir.
+def getManifestDataFromS3(requestValue):
+    currentTimestamp = int(time.time())
+    todayTime = time.strftime("%Y-%m-%d", time.gmtime(currentTimestamp))
+    yesterdayTime = time.strftime("%Y-%m-%d", time.gmtime(currentTimestamp - 3600 * 24))
+    responseDir = {}
+    
+    client = boto3.client('s3')
+    try:
+        client.download_file(bucketName, objectKeyPathPrefix + todayTime + objectKeyPathSuffix, 'manifest.json')
+    except botocore.exceptions.ClientError as e:
+        try:
+            client.download_file(bucketName, objectKeyPathPrefix + yesterdayTime + objectKeyPathSuffix, 'manifest.json')
+        except botocore.exceptions.ClientError as ee:
+            return {}
+        else:
+            with open('manifest.json') as json_input:
+                data = json.load(json_input)
+
+            for item in requestValue:
+                if data.has_key(item):
+                    responseDir[item] = data[item]
+            
+            os.remove('manifest.json')
+            return responseDir
+    else:
+        with open('manifest.json') as json_input:
+            data = json.load(json_input)
+
+        for item in requestValue:
+            if data.has_key(item):
+                responseDir[item] = data[item]
+            
+        os.remove('manifest.json')
+        return responseDir
+
+# Batch get items.
+# Input:    Array. All actions.
+# Output:   Response.
+def batchGetItemsByArray(data):
+    client = boto3.client('dynamodb')
+    
+    response = client.batch_get_item(
+        RequestItems = {
+            tableName: {
+                'Keys': data
+            }
+        }
+    )
+    
+    return response['Responses'][tableName]
+
 # Batch write items.
 # Input:    Array. All actions.
 # Output:   Dir. Failure actions. 
@@ -61,24 +119,75 @@ def batchWriteItemsByArray(data):
     
     return response['UnprocessedItems']
 
+# Get DDB Item by attributes.
+def getItemByAttr(timeUnit, startTime, dataRange):
+    client = boto3.client('dynamodb')
+    
+    response = client.get_item(
+        TableName = tableName,
+        Key = {
+            'TimeUnit': createDDBNumberFormat(timeUnit),
+            'StartTime': createDDBNumberFormat(startTime)
+        },
+        ProjectionExpression = dataTypeResponse[dataRange.value]
+    )
+    
+    if response.has_key('Item'):
+        return response['Item']
+    else:
+        return {}
+
 # Query DDB by attributes.
-# Input:    timeUnit, dataRange(dataType.enum), limit.
+# Input:    timeUnit, dataRange(dataType.enum), limit(-1: All).
 # Output:   Query response.
 def queryByAttr(timeUnit, dataRange, limit=100):
     client = boto3.client('dynamodb')
     
-    response = client.query(
-        TableName = tableName,
-        Limit = limit,
-        KeyConditionExpression = 'TimeUnit = :timeUnit',
-        ExpressionAttributeValues = {
-            ':timeUnit': createDDBNumberFormat(timeUnit)
-        }
-        # ProjectionExpression = dataTypeResponse[dataRange.value]
-    )
-    
-    return response
+    if limit != -1:
+        response = client.query(
+            TableName = tableName,
+            Limit = limit,
+            KeyConditionExpression = 'TimeUnit = :timeUnit',
+            ExpressionAttributeValues = {
+                ':timeUnit': createDDBNumberFormat(timeUnit)
+            },
+            ProjectionExpression = dataTypeResponse[dataRange.value]
+        )
+        
+        return response['Items']
+    else:
+        items = []
+        
+        response = client.query(
+            TableName = tableName,
+            Limit = 100,
+            KeyConditionExpression = 'TimeUnit = :timeUnit',
+            ExpressionAttributeValues = {
+                ':timeUnit': createDDBNumberFormat(timeUnit)
+            },
+            ProjectionExpression = dataTypeResponse[dataRange.value]
+        )
+        items = items + response['Items']
+        
+        while response.has_key('LastEvaluatedKey'):
+            response = client.query(
+                TableName = tableName,
+                Limit = 100,
+                KeyConditionExpression = 'TimeUnit = :timeUnit',
+                ExpressionAttributeValues = {
+                    ':timeUnit': createDDBNumberFormat(timeUnit)
+                },
+                ProjectionExpression = dataTypeResponse[dataRange.value],
+                ExclusiveStartKey = response['LastEvaluatedKey']
+            )
+            
+            items = items + response['Items']
+            
+        return items
 
+# Create DDB Number Format.
+# Input:    Int.
+# Output:   Format Dir.
 def createDDBNumberFormat(number):
     return { 'N': str(number) }
 
@@ -110,8 +219,70 @@ def createDDBDataFormat(timeUnit, startTime, successObjectNum=-1, successObjectS
     return data
 
 # Update project start time.
+# Output:   True|False
 def updateProjectStartTime():
-    print queryByAttr(1, dataType.onlyStartTime, 1)
+    ddbResponse = queryByAttr(1, dataType.onlyStartTime, 1)
+    
+    if ddbResponse == []:
+        return False
+    else:
+        projectStartTime = int(ddbResponse[0]['StartTime']['N'])
+        metadataModel.updateConfigurationValue('project_start_time', projectStartTime)
+        return True
+
+# Return data to server controller.
+def returnTotalProgressData():
+    if updateProjectStartTime():
+        currentTimestamp = int(time.time()) / 60 * 60
+        
+        returnData = {'startTime': projectStartTime}
+        
+        manifest = getManifestDataFromS3(['statistics'])
+        if manifest != {}:
+            returnData['totalSize'] = manifest['statistics']['totalObjectsSizeGB'] * 1000000000
+            returnData['totalObjects'] = manifest['statistics']['totalObjects']
+            returnData['successSize'] = 0
+            returnData['successObjects'] = 0
+        else:
+            return {}
+        
+        success60MData = queryByAttr(60, dataType.onlySuccess, -1)
+        for item in success60MData:
+            returnData['successSize'] += int(item['SuccessObjectSize']['N'])
+            returnData['successObjects'] += int(item['SuccessObjectNum']['N'])
+            
+        itemResponse = getItemByAttr(1, currentTimestamp - speedCollectDelay * 60, dataType.onlySuccessSize)
+        if itemResponse == {}:
+            returnData['estimateSpeed'] = int(getItemByAttr(1, projectStartTime, dataType.onlySuccessSize)['SuccessObjectSize']['N'])
+        else:
+            returnData['estimateSpeed'] = int(itemResponse['SuccessObjectSize']['N'])
+            
+        return returnData
+    else:
+        return {}
+        
+def returnTasksGraphData():
+    currentDayTimestamp = int(time.time()) / 3600 / 24 * 3600 * 24
+    
+    # Batch get items in DynamoDB
+    data = []
+    for i in xrange(24):
+        data.append({
+            'TimeUnit': createDDBNumberFormat(60),
+            'StartTime': createDDBNumberFormat(currentDayTimestamp + i * 3600)
+        })
+    response = batchGetItemsByArray(data)
+    
+    returnData = {'successObjects': [], 'failureObjects': []}
+    for i in xrange(24):
+        returnData['successObjects'].append(0)
+        returnData['failureObjects'].append(0)
+    for item in response:
+        itemStartTime = int(item['StartTime']['N'])
+        returnData['successObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['SuccessObjectNum']['N'])
+        returnData['failureObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['FailedObjectNum']['N'])
+        
+    return returnData
 
 # Create test data in DDB.
 def createTestDataToS3AndDDB():
@@ -126,7 +297,8 @@ def createTestDataToS3AndDDB():
         'sourceBucket': 'test-source-bucket',
         'destinationBucket': 'test-destination-bucket',
         'statistics': {
-            'totalObjects': 2294893
+            'totalObjects': 2294893,
+            'totalObjectsSizeGB': 22985
         },
         'fileFormat' : 'json'
     }
@@ -136,7 +308,7 @@ def createTestDataToS3AndDDB():
     fp.close()
     
     s3 = boto3.resource('s3')
-    s3.meta.client.upload_file('test.json', bucketName, 'aws-collections/aws-collections-inventory/' + testStartTimeDay + 'T08-00Z/manifest.json')
+    s3.meta.client.upload_file('test.json', bucketName, objectKeyPathPrefix + testStartTimeDay + objectKeyPathSuffix)
     os.remove('test.json')
     
     # Create items in DynamoDB
@@ -158,5 +330,3 @@ def createTestDataToS3AndDDB():
                 }
             })
         batchWriteItemsByArray(data)
-
-updateProjectStartTime()
