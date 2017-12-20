@@ -5,21 +5,41 @@ import json
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type","application/json")
-        self.end_headers()
-        try:
-            #redirect stdout to client
-            stdout=sys.stdout
-            sys.stdout=self.wfile
-            self.makepage()
-        finally:
-            sys.stdout=stdout #restore
+        if self.path == "/totalProgress":
+            self.send_response(200)
+            self.send_header("Content-type","application/json")
+            self.send_header("Access-Control-Allow-origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET")
+            self.end_headers()
+            try:
+                #redirect stdout to client
+                stdout = sys.stdout
+                sys.stdout = self.wfile
+                self.printTotalProgress()
+            finally:
+                sys.stdout = stdout #restore
+        elif self.path == "/tasksGraph":
+            self.send_response(200)
+            self.send_header("Content-type","application/json")
+            self.send_header("Access-Control-Allow-origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET")
+            self.end_headers()
+            try:
+                #redirect stdout to client
+                stdout = sys.stdout
+                sys.stdout = self.wfile
+                self.printTasksGraph()
+            finally:
+                sys.stdout = stdout #restore
+        else:
+            self.send_error(404,"file not found");
+            return
     
-    def makepage(self):
-        inputTime = self.path[1:]
+    def printTotalProgress(self):
+        print json.dumps(ddbModel.returnTotalProgressData())
         
-        print json.dumps(ddbModel.getItemsAfterTime(inputTime))
+    def printTasksGraph(self):
+        print json.dumps(ddbModel.returnTasksGraphData())
 
 def main():
     PORT = 8000
