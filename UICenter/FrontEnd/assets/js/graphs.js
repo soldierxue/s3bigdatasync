@@ -1,3 +1,5 @@
+var tasksGraphData = []
+
 function loadTasksGraph() {
     var tasksGraphRootG = document.getElementById("tasksGraphRootG");
     if (tasksGraphRootG != null) { tasksGraphRootG.parentNode.removeChild(tasksGraphRootG); }
@@ -19,7 +21,7 @@ function loadTasksGraph() {
     var xz = d3.range(seriesValue),
     x00z = xz.map(function(x) { return x + ":00"; }),
     // yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
-    yz = getDataFromAPIEndpoint(),
+    yz = tasksGraphData,
     y01z = d3.stack().keys(d3.range(seriesNumber))(d3.transpose(yz)),
     yMax = d3.max(yz, function(y) { return d3.max(y); }),
     y1Max = d3.max(y01z, function(y) { return d3.max(y, function(d) { return d[1]; }); });
@@ -216,15 +218,20 @@ function loadTasksGraph() {
 
 // Get Data From API Endpoint.
 function getDataFromAPIEndpoint() {
-    var obj = new XMLHttpRequest();
-    obj.open("GET", APIEndpoint + "/tasksGraph", true);
-    obj.setRequestHeader("Content-type", "application/json");
+    if (window.XMLHttpRequest) {
+        var obj = new XMLHttpRequest();
+    } else if (window.ActiveXObject) {
+        var obj = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    obj.open("GET", APIEndpoint + "tasksGraph", true);
     
     obj.onreadystatechange = function() {
-        if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304 || obj.status == 201)) {
-            data = obj.responseText;
+        if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304)) {
+            data = eval("(" + obj.responseText + ")");
             
-            return [data.successObjects, data.failureObjects]
+            tasksGraphData = [data.successObjects, data.failureObjects];
+            console.log(tasksGraphData);
+            loadTasksGraph();
         }
     };
     obj.send(null);
@@ -271,4 +278,4 @@ function bumps(value) {
     return values;
 }
 
-loadTasksGraph()
+getDataFromAPIEndpoint()

@@ -1,14 +1,19 @@
 var data = {};
 
 function getTotalProgressValueFromDDB(callback) {
-    var obj = new XMLHttpRequest();
-    obj.open("GET", APIEndpoint + "/totalProgress", true);
-    obj.setRequestHeader("Content-type", "application/json");
+    if (window.XMLHttpRequest) {
+        var obj = new XMLHttpRequest();
+    } else if (window.ActiveXObject) {
+        var obj = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    obj.open("GET", APIEndpoint + "totalProgress", true);
     
     obj.onreadystatechange = function() {
         if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304 || obj.status == 201)) {
-            if obj.responseText != {} {
-                data = obj.responseText;
+            if (obj.responseText != "{}") {
+                data = eval("(" + obj.responseText + ")");
+                console.log(data);
+                
                 callback();
             }
         }
@@ -17,7 +22,7 @@ function getTotalProgressValueFromDDB(callback) {
 }
 
 function updateTotalProgress() {
-    if data != {} {
+    if (data != {}) {
         var successSizeData = getNumberAndUnitFromBytes(data.successSize);
         document.getElementById("success-progress-size").innerHTML = successSizeData[0];
         document.getElementById("success-progress-unit").innerHTML = successSizeData[1];
@@ -33,7 +38,7 @@ function updateTotalProgress() {
         
         var estimateSpeedData = getNumberAndUnitFromBytes(data.estimateSpeed);
         document.getElementById("current-speed-value").innerHTML = estimateSpeedData[0];
-        document.getElementById("current-speed-unit").innerHTML = estimateSpeedData[1] + "/min";
+        document.getElementById("current-speed-unit").innerHTML = estimateSpeedData[1] + " / min";
         
         var startTime = new Date();
         startTime.setTime(data.startTime * 1000);
@@ -46,11 +51,17 @@ function updateTotalProgress() {
         } else {
             document.getElementById("project-status").innerHTML = "In progress";
             
-            estimateTimeSpend = Date.parse(new Date()) + (data.totalSize - data.successSize) / estimateSpeed * 60000;
-            var estimateTime = new Date();
-            estimateTime.setTime(estimateTimeSpend);
-            
-            document.getElementById("expected-end-time").innerHTML = estimateTime.Format("yyyy/MM/dd hh:mm");
+            estimateTimeNeeded = (data.totalSize - data.successSize) / data.estimateSpeed * 60;
+            if (estimateTimeNeeded > 86400) {
+                document.getElementById("expected-end-time").innerHTML = "NaN";
+            } else {
+                estimateTimeSpend = Date.parse(new Date()) + estimateTimeNeeded * 1000;
+                var estimateTime = new Date();
+                estimateTime.setTime(estimateTimeSpend);
+                console.log(estimateTimeSpend);
+                
+                document.getElementById("expected-end-time").innerHTML = estimateTime.Format("yyyy/MM/dd hh:mm");
+            }
         }
         
         document.getElementById("transfered-objects").innerHTML = data.successObjects;
@@ -96,10 +107,8 @@ Date.prototype.Format = function (fmt) {
     return fmt;
 }
 
-getTotalProgressValueFromDDB(function() {
-                             window.onload = function() {
-                                updateTotalProgress();
-                             
-                                var totalProgressAutoUpdate = window.setInterval("getTotalProgressValueFromDDB(updateTotalProgress)", 60000);
-                             }
-                            })
+window.onload = function() {
+    getTotalProgressValueFromDDB(updateTotalProgress);
+    
+    var totalProgressAutoUpdate = window.setInterval("getTotalProgressValueFromDDB(updateTotalProgress)", 60000);
+}
