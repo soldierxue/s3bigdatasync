@@ -1,10 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Metadata: 
   License: Apache-2.0
-Description: 'AWS CloudFormation Sample Template DynamoDB_Table: This template demonstrates
-  the creation of a DynamoDB table.  **WARNING** This template creates an Amazon DynamoDB
-  table. You will be billed for the AWS resources used if you create a stack from
-  this template.'
+Description: 'S3 Cross Replication Monitoring & Statistic DynamoDB'
 Parameters:
   MonitorTableName:
     Description: Name of the table
@@ -70,6 +67,20 @@ Resources:
         ProvisionedThroughput:
           ReadCapacityUnits: !Ref 'ReadCapacityUnits'
           WriteCapacityUnits: !Ref 'WriteCapacityUnits'
+      - IndexName: "ReplicationStatus-ReplicationTime-index"
+        KeySchema:
+        - AttributeName: "ReplicationStatus"
+          KeyType: HASH    
+        - AttributeName: "ReplicationTime"
+          KeyType: RANGE            
+        Projection:
+          ProjectionType: "INCLUDE"
+          NonKeyAttributes:
+          - "ObjectKey"
+          - "Size"      
+        ProvisionedThroughput:
+          ReadCapacityUnits: !Ref 'ReadCapacityUnits'
+          WriteCapacityUnits: !Ref 'WriteCapacityUnits'              
 
   statDynamoDBTable:
     Type: AWS::DynamoDB::Table
@@ -81,12 +92,12 @@ Resources:
         AttributeType: "N"
       # - AttributeName: "FailedObjectSize"
       #   AttributeType: "N"    
-      # - AttributeName: "FailedObjectNum"
-      #   AttributeType: "N"  
+      - AttributeName: "FailedObjectNum"
+        AttributeType: "N"  
       # - AttributeName: "SuccessObjectSize"
       #   AttributeType: "N"  
-      # - AttributeName: "SuccessObjectNum"
-      #   AttributeType: "N"                              
+      - AttributeName: "SuccessObjectNum"
+        AttributeType: "N"                              
       KeySchema:
       - AttributeName: "TimeUnit"
         KeyType: HASH
@@ -96,6 +107,46 @@ Resources:
         ReadCapacityUnits: !Ref 'ReadCapacityUnits'
         WriteCapacityUnits: !Ref 'WriteCapacityUnits'
       TableName: !Ref 'StatTableName'
+      GlobalSecondaryIndexes:
+      - IndexName: "gsiTimeUnit"
+        KeySchema:
+        - AttributeName: "TimeUnit"
+          KeyType: HASH
+        - AttributeName: "StartTime"
+          KeyType: RANGE                          
+        Projection:
+          ProjectionType: "INCLUDE"
+          NonKeyAttributes:
+          - "SuccessObjectNum"
+          - "FailedObjectNum"
+        ProvisionedThroughput:
+          ReadCapacityUnits: !Ref 'ReadCapacityUnits'
+          WriteCapacityUnits: !Ref 'WriteCapacityUnits' 
+
+      LocalSecondaryIndexes:
+      - IndexName: "lsiNumSuccess"
+        KeySchema:
+        - AttributeName: "TimeUnit"
+          KeyType: HASH
+        - AttributeName: "SuccessObjectNum"
+          KeyType: RANGE                          
+        Projection:
+          ProjectionType: "INCLUDE"
+          NonKeyAttributes:
+          - "FailedObjectNum"
+          - "StartTime"
+      - IndexName: "lsiNumFailed"
+        KeySchema:
+        - AttributeName: "TimeUnit"
+          KeyType: HASH
+        - AttributeName: "FailedObjectNum"
+          KeyType: RANGE                          
+        Projection:
+          ProjectionType: "INCLUDE"
+          NonKeyAttributes:
+          - "SuccessObjectNum"
+          - "StartTime"                  
+                     
           
   WriteCapacityScalableTarget:
     Type: "AWS::ApplicationAutoScaling::ScalableTarget"
@@ -120,7 +171,66 @@ Resources:
           - !Ref myDynamoDBTable
       RoleARN: !GetAtt ScalingRole.Arn
       ScalableDimension: dynamodb:table:ReadCapacityUnits
-      ServiceNamespace: dynamodb      
+      ServiceNamespace: dynamodb   
+ 
+  GSIWriteCapacityScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'WriteCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+          - index
+          - ReplicationStatus-ReplicationTime-index
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  GSIReadCapacityScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'ReadCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+          - index
+          - ReplicationStatus-ReplicationTime-index
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:ReadCapacityUnits
+      ServiceNamespace: dynamodb 
+
+  GSIWriteCapacityScalableTarget2:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'WriteCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+          - index
+          - gsiStatus
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  GSIReadCapacityScalableTarget2:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'ReadCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref myDynamoDBTable
+          - index
+          - gsiStatus
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:ReadCapacityUnits
+      ServiceNamespace: dynamodb       
+ 
   ScalingRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -176,8 +286,113 @@ Resources:
         ScaleOutCooldown: 60
         PredefinedMetricSpecification:
           PredefinedMetricType: DynamoDBReadCapacityUtilization             
-      
+  GSIWriteScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIWriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  GSIReadScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIReadCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization  
+
+  GSIWriteScalingPolicy2:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIWriteCapacityScalableTarget2
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  GSIReadScalingPolicy2:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIReadCapacityScalableTarget2
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization 
+  GSIWriteCapacityScalableTarget3:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'WriteCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref statDynamoDBTable
+          - index
+          - gsiTimeUnit
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  GSIReadCapacityScalableTarget3:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 10000
+      MinCapacity: !Ref 'ReadCapacityUnits'
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref statDynamoDBTable
+          - index
+          - gsiTimeUnit
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:index:ReadCapacityUnits
+      ServiceNamespace: dynamodb 
+  GSIWriteScalingPolicy3:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIWriteCapacityScalableTarget3
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  GSIReadScalingPolicy3:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref GSIReadCapacityScalableTarget3
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization  
+                    
+
 Outputs:
-  TableName:
+  MonitorTableName:
     Value: !Ref 'myDynamoDBTable'
-    Description: Table name of the newly created DynamoDB table
+    Description: Table name of the newly created monitor table
+  StatisticTableName:
+    Value: !Ref 'statDynamoDBTable'
+    Description: Table name of the newly created statistic table    
