@@ -42,5 +42,12 @@ def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor",
 def batchPutStatus(monitorItems,profile='default',tableName="s3cross_monitor")
 ```
         
+- 统计监控表的状态数据
+```python
+# Inputs:
+#       profile # the IAM role profile name, default value is 'default' 
+# 
+def statRunByScanItems(profile='default',monitorTableName="s3cross_monitor",indexMonitor="ReplicationStatus-ReplicationTime-index",statTableName="s3cross_stat"):
+```
 
 

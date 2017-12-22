@@ -70,7 +70,7 @@ def isDDBTableExist(tableName,profile='default'):
             return False
         return False
 
-def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor_tb",statTableName="s3cross_stat_tb"):
+def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor",statTableName="s3cross_stat"):
     logger.info(" Prepare DDB Table for S3 Cross Replication Monitoring ")
     session = boto3.Session(profile_name=profile)
     cfClient = session.client('cloudformation') 
@@ -83,7 +83,10 @@ def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor_t
         logger.info("Stack Already Exist, we will try to update it!!")
         updateStackRes = cfClient.update_stack(
             StackName = stackName,
-            TemplateBody=cfBody
+            TemplateBody=cfBody,
+            Capabilities=[
+                'CAPABILITY_IAM',
+            ]           
         )       
     else:
         # create the stack
@@ -108,7 +111,7 @@ def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor_t
                 ],
                 TimeoutInMinutes=5,
                 Capabilities=[
-                    'CAPABILITY_NAMED_IAM',
+                    'CAPABILITY_IAM',
                 ],
                 OnFailure='ROLLBACK',
                 Tags=[
@@ -123,9 +126,28 @@ def prepareDDBResourceByCF(profile='default',monitorTableName="s3cross_monitor_t
                 ],
                 ClientRequestToken='string',
                 EnableTerminationProtection=False
-            )           
+            )     
+## Private Function to init a start time item, that we can easily get the time when
+# objects begins to replicate 
+isInitTimeSuccess = False 
+MONITOR_INIT_KEY = 'PlaceHolder_First_Monitor_Item_Key'
+MONITOR_INIT_STATUS = '10'
+def initMonitorTime(profile='default',tableName="s3cross_monitor"):
+    logger.info("** Init Monitor Time**")
+    if isInitTimeSuccess is False:
+        session = boto3.Session(profile_name=profile)
+        ddbClient = session.client('dynamodb')
+        res = ddbClient.put_item(
+            TableName=tableName,
+            Item={
+                "ObjectKey":{"S":MONITOR_INIT_KEY}
+                ,"ReplicationStatus":{"N":MONITOR_INIT_STATUS}
+                ,"ReplicationTime":{"N":str(current_time_seconds())}
+            }
+        )        
 
-def batchPutStatus(monitorItems,profile='default',tableName="s3cross_monitor_tb"):
+
+def batchPutStatus(monitorItems,profile='default',tableName="s3cross_monitor"):
     MAX_ITEM_ONE_BATCH = 2#25
     count = 0
     batchRequests = []
@@ -179,7 +201,7 @@ def batchPutStatus(monitorItems,profile='default',tableName="s3cross_monitor_tb"
                 RequestItems=req
             )
 
-def statRun(profile='default',monitorTableName="s3cross_monitor_tb",statTableName="s3cross_stat_tb"):
+def statRun(profile='default',monitorTableName="s3cross_monitor",statTableName="s3cross_stat"):
     logger.info("*** S3 Replication Statistic Run ***")
     # query the Success Migrating Objects
     resSuccess = ddbQuery_MonitorItems("1",None,profile,monitorTableName)
@@ -203,9 +225,56 @@ def statRun(profile='default',monitorTableName="s3cross_monitor_tb",statTableNam
         else:
             isMoreItems = False   
     logger.info("Total Items#"+str(len(totalItems)))
- 
 
-def ddbQuery_MonitorItems(replicationStatus='1',lastEvaluatedKey=None,profile='default',tableName='s3cross_monitor_tb',indexName='gsiStatus'):
+def ddbQuery_MonitorItems2(replicationStatus='1',profile='default',tableName='s3cross_monitor',indexName='gsiStatus'):
+    logger.info("*** DDB Query Request2 ***")
+    session = boto3.Session(profile_name=profile)
+    ddbClient = session.client('dynamodb')
+    paginator = ddbClient.get_paginator('query')
+    totalItems = [] 
+    try:
+        iterator = paginator.paginate(
+            TableName=tableName
+            ,IndexName=indexName
+            ,Select='ALL_PROJECTED_ATTRIBUTES'#'COUNT',
+            ,KeyConditions={
+                'ReplicationStatus':{
+                    'AttributeValueList':[
+                        {'N':replicationStatus}
+                    ]
+                    ,'ComparisonOperator':'EQ'
+                }
+            }
+            # ,QueryFilter={
+            #     'ReplicationTime':{
+            #         'AttributeValueList':[
+            #             {'N':'1513601631'}
+            #         ]
+            #         ,'ComparisonOperator':'GE'#|'NE'|'IN'|'LE'|'LT'|'GE'|'GT'|'BETWEEN'|'NOT_NULL'|'NULL'|'CONTAINS'|'NOT_CONTAINS'|'BEGINS_WITH'
+            #     }
+            #     ,'ReplicationTime':{
+            #         'AttributeValueList':[
+            #             {'N':'1513621631'}
+            #         ]
+            #         ,'ComparisonOperator':'LE'#|'NE'|'IN'|'LE'|'LT'|'GE'|'GT'|'BETWEEN'|'NOT_NULL'|'NULL'|'CONTAINS'|'NOT_CONTAINS'|'BEGINS_WITH'
+            #     }                          
+            # }
+            ,PaginationConfig={
+                # 'MaxItems': 10,
+                'PageSize': 10
+            }            
+        )
+        for page in iterator:
+            items = page['Items']
+            totalItems.extend(items)   
+            # logger.info("resume token#"+iterator.resume_token) 
+        logger.info("Len#"+str(len(totalItems)))        
+    except:
+        traceback.print_exc()
+        return []    
+    return totalItems
+
+def ddbQuery_MonitorItems(replicationStatus='1',lastEvaluatedKey=None,profile='default',tableName='s3cross_monitor',indexName='gsiStatus'):
     logger.info("*** DDB Query Request ***")
     session = boto3.Session(profile_name=profile)
     ddbClient = session.client('dynamodb')
@@ -338,7 +407,10 @@ def main():
         }                                
     ]
     # batchPutStatus(testMonitorObjects,"bjs")
-    statRun("bjs")
+    # statRun("bjs")
+    ddbQuery_MonitorItems2("1","bjs")
+    ddbQuery_MonitorItems2("0","bjs")
+    ddbQuery_MonitorItems2("10","bjs")
 
 if __name__ == "__main__":
     main()     
