@@ -7,7 +7,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/totalProgress":
             self.send_response(200)
-            self.send_header("Content-type","application/json")
+            self.send_header("Content-type","application/json; charset=utf-8")
             self.send_header("Access-Control-Allow-origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET")
             self.end_headers()
@@ -20,7 +20,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
                 sys.stdout = stdout #restore
         elif self.path == "/tasksGraph":
             self.send_response(200)
-            self.send_header("Content-type","application/json")
+            self.send_header("Content-type","application/json; charset=utf-8")
             self.send_header("Access-Control-Allow-origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET")
             self.end_headers()

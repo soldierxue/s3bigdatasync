@@ -1,1 +1,1 @@
-{"project_start_time": 1513715520, "bucket_name": "david-s3bigdatasync-test", "table_name": "Test", "region_id": "us-east-1", "speed_collect_delay": 10}
+{"table_name": "s3cross_stat", "bucket_name": "s3-big-data-sync-nvhblnixrffcmr", "project_start_time": 0, "region_id": "us-east-1", "speed_collect_delay": 10}

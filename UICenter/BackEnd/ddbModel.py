@@ -42,7 +42,6 @@ def getTemporaryCertificate(service):
     awsSK = IAMTemporaryCertificate['SecretAccessKey']
     awsToken = IAMTemporaryCertificate['Token']
 
-    global client
     client = boto3.client(
         service,
         aws_access_key_id = awsAK,
@@ -50,6 +49,8 @@ def getTemporaryCertificate(service):
         region_name = awsRegionID,
         aws_session_token = awsToken
     )
+    
+    return client
 
 # Get manifest data from S3 bucket.
 # Input:    Request value [].
@@ -60,7 +61,8 @@ def getManifestDataFromS3(requestValue):
     yesterdayTime = time.strftime("%Y-%m-%d", time.gmtime(currentTimestamp - 3600 * 24))
     responseDir = {}
     
-    client = boto3.client('s3')
+    # client = boto3.client('s3')
+    client = getTemporaryCertificate('s3')
     try:
         client.download_file(bucketName, objectKeyPathPrefix + todayTime + objectKeyPathSuffix, 'manifest.json')
     except botocore.exceptions.ClientError as e:
@@ -93,7 +95,8 @@ def getManifestDataFromS3(requestValue):
 # Input:    Array. All actions.
 # Output:   Response.
 def batchGetItemsByArray(data):
-    client = boto3.client('dynamodb')
+    # client = boto3.client('dynamodb')
+    client = getTemporaryCertificate('dynamodb')
     
     response = client.batch_get_item(
         RequestItems = {
@@ -109,7 +112,8 @@ def batchGetItemsByArray(data):
 # Input:    Array. All actions.
 # Output:   Dir. Failure actions. 
 def batchWriteItemsByArray(data):
-    client = boto3.client('dynamodb')
+    # client = boto3.client('dynamodb')
+    client = getTemporaryCertificate('dynamodb')
     
     response = client.batch_write_item(
         RequestItems = {
@@ -121,7 +125,8 @@ def batchWriteItemsByArray(data):
 
 # Get DDB Item by attributes.
 def getItemByAttr(timeUnit, startTime, dataRange):
-    client = boto3.client('dynamodb')
+    # client = boto3.client('dynamodb')
+    client = getTemporaryCertificate('dynamodb')
     
     response = client.get_item(
         TableName = tableName,
@@ -129,7 +134,7 @@ def getItemByAttr(timeUnit, startTime, dataRange):
             'TimeUnit': createDDBNumberFormat(timeUnit),
             'StartTime': createDDBNumberFormat(startTime)
         },
-        ProjectionExpression = dataTypeResponse[dataRange.value]
+        ProjectionExpression = dataTypeResponse[dataRange]
     )
     
     if response.has_key('Item'):
@@ -141,7 +146,8 @@ def getItemByAttr(timeUnit, startTime, dataRange):
 # Input:    timeUnit, dataRange(dataType.enum), limit(-1: All).
 # Output:   Query response.
 def queryByAttr(timeUnit, dataRange, limit=100):
-    client = boto3.client('dynamodb')
+    # client = boto3.client('dynamodb')
+    client = getTemporaryCertificate('dynamodb')
     
     if limit != -1:
         response = client.query(
@@ -151,7 +157,7 @@ def queryByAttr(timeUnit, dataRange, limit=100):
             ExpressionAttributeValues = {
                 ':timeUnit': createDDBNumberFormat(timeUnit)
             },
-            ProjectionExpression = dataTypeResponse[dataRange.value]
+            ProjectionExpression = dataTypeResponse[dataRange]
         )
         
         return response['Items']
@@ -165,7 +171,7 @@ def queryByAttr(timeUnit, dataRange, limit=100):
             ExpressionAttributeValues = {
                 ':timeUnit': createDDBNumberFormat(timeUnit)
             },
-            ProjectionExpression = dataTypeResponse[dataRange.value]
+            ProjectionExpression = dataTypeResponse[dataRange]
         )
         items = items + response['Items']
         
@@ -177,7 +183,7 @@ def queryByAttr(timeUnit, dataRange, limit=100):
                 ExpressionAttributeValues = {
                     ':timeUnit': createDDBNumberFormat(timeUnit)
                 },
-                ProjectionExpression = dataTypeResponse[dataRange.value],
+                ProjectionExpression = dataTypeResponse[dataRange],
                 ExclusiveStartKey = response['LastEvaluatedKey']
             )
             
@@ -330,3 +336,5 @@ def createTestDataToS3AndDDB():
                 }
             })
         batchWriteItemsByArray(data)
+
+# createTestDataToS3AndDDB()
