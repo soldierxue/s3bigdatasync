@@ -15,7 +15,8 @@
 
     "KeyName" : {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
-      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Type" : "String",
+      "Default": "",
       "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
     },
     
@@ -35,6 +36,12 @@
       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
       "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
     }
+  },
+
+  "Conditions" : {
+    "NotUseEC2Key" : {"Fn::Equals" : [{"Ref" : "KeyName"}, ""]},
+    "UseEC2Key" : {"Fn::Not" : [{"Fn::Equals" : [{"Ref" : "KeyName"}, ""]}] },
+    "CNSpecial" : {"Fn::Or" : [{"Fn::Equals" : [{ "Ref" : "AWS::Region" }, "cn-north-1"]}, {"Fn::Equals" : [{ "Ref" : "AWS::Region" }, "cn-northwest-1"]}]}
   },
 
   "Mappings" : {
@@ -173,8 +180,9 @@
   },
 
   "Resources" : {
-    "EC2Instance" : {
+    "EC2InstanceWithEC2Key" : {
       "Type" : "AWS::EC2::Instance",
+      "Condition" : "UseEC2Key",
       "Properties" : {
         "UserData" : { "Fn::Base64" : { "Ref" : "UserData" } },
         "Tags": [ { "Key" : "Name", "Value" : "S3-BigData-Sync-Server" } ],
@@ -182,6 +190,20 @@
         "InstanceType" : { "Ref" : "InstanceType" },
         "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
         "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] }
+      }
+    },
+    
+    "EC2InstanceWithoutEC2Key" : {
+      "Type" : "AWS::EC2::Instance",
+      "Condition" : "NotUseEC2Key",
+      "Properties" : {
+        "UserData" : { "Fn::Base64" : { "Ref" : "UserData" } },
+        "Tags": [ { "Key" : "Name", "Value" : "S3-BigData-Sync-Server" } ],
+        "IamInstanceProfile": { "Ref" : "InstanceProfile" },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
         "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
                           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] }
       }
@@ -201,10 +223,20 @@
       "Type" : "AWS::EC2::EIP"
     },
 
-    "IPAssoc" : {
+    "IPAssocWithEC2Key" : {
       "Type" : "AWS::EC2::EIPAssociation",
+      "Condition" : "UseEC2Key",
       "Properties" : {
-        "InstanceId" : { "Ref" : "EC2Instance" },
+        "InstanceId" : { "Ref" : "EC2InstanceWithEC2Key" },
+        "EIP" : { "Ref" : "IPAddress" }
+      }
+    },
+    
+    "IPAssocWithoutEC2Key" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Condition" : "NotUseEC2Key",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "EC2InstanceWithoutEC2Key" },
         "EIP" : { "Ref" : "IPAddress" }
       }
     },
@@ -217,7 +249,11 @@
                "Statement": [ {
                   "Effect": "Allow",
                   "Principal": {
-                     "Service": [ "ec2.amazonaws.com" ]
+                     "Service": [{"Fn::If" : [
+                        "CNSpecial",
+                        "ec2.amazonaws.com.cn",
+                        "ec2.amazonaws.com"
+                     ]}]
                   },
                   "Action": [ "sts:AssumeRole" ]
                } ]
@@ -251,10 +287,6 @@
       }
   },
   "Outputs" : {
-    "InstanceId" : {
-      "Description" : "InstanceId of the newly created EC2 instance",
-      "Value" : { "Ref" : "EC2Instance" }
-    },
     "InstanceIPAddress" : {
       "Description" : "IP address of the newly created EC2 instance",
       "Value" : { "Ref" : "IPAddress" }
