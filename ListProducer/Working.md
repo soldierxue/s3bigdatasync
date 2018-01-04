@@ -10,6 +10,7 @@ aws s3 ls s3://leo-bjs-inventory-bucket/leodatacenter/leodatacenter/2017-12-30T0
 # Sub-tasks
 [X] Buck list S3 buckets size/files [GitHub Pages](https://github.com/iceflow/aws-demo/blob/master/s3/cli/s3-stat.sh)
 [ ] Get latest bucket related manifest pos  
-[ ] Getting specific manifest, downloading data and parsing the tasks
+[X] Getting specific manifest, downloading data and parsing the tasks
+[X] Batch create working queues with dead letter enabled
 Options:
 [ ] Get bucket inventory position information
