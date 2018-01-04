@@ -1,0 +1,12 @@
+{
+  "sourceBucket" : "leodatacenter",
+  "destinationBucket" : "arn:aws-cn:s3:::leo-bjs-inventory-bucket",
+  "version" : "2016-11-30",
+  "fileFormat" : "CSV",
+  "fileSchema" : "Bucket, Key, Size, LastModifiedDate, ETag, StorageClass, IsMultipartUploaded, ReplicationStatus",
+  "files" : [ {
+    "key" : "leodatacenter/leodatacenter/data/15ac138b-1463-484c-b6da-b46fede3433c.csv.gz",
+    "size" : 104901,
+    "MD5checksum" : "95dd4d38aab485f57765c5b6f4cd3e3d"
+  } ]
+}
