@@ -11,19 +11,31 @@ import json
 
 #session = boto3.Session(profile_name='joyou@ctrip')
 #client = session.client('sqs')
-client = boto3.client('sqs')
+sqs_client = boto3.client('sqs')
 
+def send_msg_to_sqs(qurl, body=None):
 
+    if body is None:
+        return False
+
+    response = sqs_client.send_message(
+        QueueUrl=qurl,
+        MessageBody=json.dumps(body)
+    )
+    print "send_msg_to_sql:({0}..Number[{1}].".format(qurl, len(body))
+    #print response
+
+    return True
 
 def list_test():
-    response = client.list_queues(
+    response = sqs_client.list_queues(
         QueueNamePrefix='https://cn-north-1.queue.amazonaws.com.cn/358620020600/s3sync-worker-dead1'
     )
 
     pprint(response)
 
 def send_test():
-    response = client.send_message(
+    response = sqs_client.send_message(
         QueueUrl='https://sqs.eu-west-1.amazonaws.com/888250974927/s3-copy-list-1',
         MessageBody='string'
     )
@@ -32,7 +44,7 @@ def send_test():
 
 
 def recv_test():
-    response = client.receive_message(
+    response = sqs_client.receive_message(
         QueueUrl='https://eu-west-1.queue.amazonaws.com/888250974927/s3-copy-list-18',
         MaxNumberOfMessages=10
     )
@@ -40,7 +52,7 @@ def recv_test():
     pprint(response)
 
 def get_queue_attributes(queue_url=None):
-    response = client.get_queue_attributes(
+    response = sqs_client.get_queue_attributes(
         QueueUrl=queue_url,
         AttributeNames=['All']
     )
@@ -50,7 +62,7 @@ def get_queue_attributes(queue_url=None):
     return(response)
 
 def get_queue_attributes_arn(queue_url=None):
-    response = client.get_queue_attributes(
+    response = sqs_client.get_queue_attributes(
         QueueUrl=queue_url,
         AttributeNames=['QueueArn']
     )
@@ -60,7 +72,7 @@ def get_queue_attributes_arn(queue_url=None):
     return(response['Attributes']['QueueArn'])
     
 def delete_queue(queue_url=None):
-    response = client.delete_queue(
+    response = sqs_client.delete_queue(
         QueueUrl=queue_url
     )
 
@@ -81,7 +93,7 @@ def create_sqs(queue_name=None, enable_dead_letter=False, redrive_policy=None ):
     Attributes['VisibilityTimeout']='60'
     Attributes['ReceiveMessageWaitTimeSeconds']='5'
 
-    response = client.create_queue(
+    response = sqs_client.create_queue(
         QueueName=queue_name,
         Attributes=Attributes
     )

@@ -1,6 +1,8 @@
 # Samples
 src: s3://leodatacenter in cn-north-1 region
 src inventory position: s3://leo-bjs-inventory-bucket/leodatacenter/leodatacenter
+src statics: leodatacenter BucketSizeBytes 130172152512.0    2017-12-24T00:00:00Z    Bytes NumberOfObjects 3306.0    2017-12-24T00:00:00Z    Count
+
 dst: s3://leo-zhy-datacenter  in cn-northwest-1 region
 dst inventory position: s3://leo-zhy-inventory-bucket/leo-zhy-datacenter/daily-check
 

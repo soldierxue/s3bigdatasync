@@ -3,12 +3,23 @@
 
 import boto3
 import gzip
+import json
 
 print("boto3.version [{}]".format(boto3.__version__))
 
 from utils import *
 
 s3 = boto3.resource('s3')
+
+s3_client = boto3.client('s3')
+
+
+def save_json_to_s3_object(json_data, dst_bucket, dst_key):
+    # with open('filename', 'rb') as data:
+    object = s3.Object(dst_bucket, dst_key)
+    #print(json.dumps(json_data))
+    object.put(Body=json.dumps(json_data))
+    #s3_client.upload_fileobj(json.dumps(json_data), dst_bucket, dst_key)
 
 def s3_download(bucket_name=None, key=None):
     ''' s3_download(bucket_name=None, key=None):
@@ -74,7 +85,13 @@ def download_s3_object_from_inventory(bucket_name=None, inventory_item=None):
 
 
 if __name__ == '__main__':
-    data = load_json_from_s3_object('leo-bjs-inventory-bucket', 'leodatacenter/leodatacenter/2017-12-25T08-00Z/manifest.json')
+    
+    A={'a':1, 'b':'bb'}
+    save_json_to_s3_object(A, 'leo-bjs-inventory-bucket', 'leodatacenter/leodatacenter/2017-12-25T08-00Z/job.json')
+
+    data = load_json_from_s3_object('leo-bjs-inventory-bucket', 'leodatacenter/leodatacenter/2017-12-25T08-00Z/job.json')
+
+    #data = load_json_from_s3_object('leo-bjs-inventory-bucket', 'leodatacenter/leodatacenter/2017-12-25T08-00Z/manifest.json')
     '''
     filename = s3_download('leo-bjs-inventory-bucket', 'leodatacenter/leodatacenter/2017-12-25T08-00Z/manifest.json')
     print(filename)
