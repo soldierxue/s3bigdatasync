@@ -155,6 +155,8 @@ def main():
 
     pprint(data)
 
+    print("=== Job description is at s3://{}/{}".format(job_info['inventory_bucket'], job_info['inventory_manifest_dir']+'job.json'))
+
 
 if __name__ == '__main__':
     main()
