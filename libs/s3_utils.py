@@ -14,6 +14,25 @@ s3 = boto3.resource('s3')
 
 s3_client = boto3.client('s3')
 
+def s3_copy(src_bucket, dst_bucket, key):
+    """
+    Return Value:
+    True:  Copy succesful
+    False: Copy failed
+    """
+    #return True
+    copy_source = {
+        'Bucket': src_bucket,
+        'Key': key
+    }
+
+    try:
+        res = s3.meta.client.copy(copy_source, dst_bucket, key)
+    except Exception,data:
+        print "s3_copy error:", data
+        return False
+
+    return True
 
 def save_json_to_s3_object(json_data, dst_bucket, dst_key):
     # with open('filename', 'rb') as data:

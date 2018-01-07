@@ -22,7 +22,7 @@ def send_msg_to_sqs(qurl, body=None):
         QueueUrl=qurl,
         MessageBody=json.dumps(body)
     )
-    print "send_msg_to_sql:({0}..Number[{1}].".format(qurl, len(body))
+    print("send_msg_to_sqs:({0}..Number[{1}].".format(qurl, len(body)))
     #print response
 
     return True
@@ -90,7 +90,7 @@ def create_sqs(queue_name=None, enable_dead_letter=False, redrive_policy=None ):
     if enable_dead_letter:
         Attributes['RedrivePolicy'] = json.dumps(redrive_policy)
     
-    Attributes['VisibilityTimeout']='60'
+    Attributes['VisibilityTimeout']='3600' # 1 hour
     Attributes['ReceiveMessageWaitTimeSeconds']='5'
 
     response = sqs_client.create_queue(
@@ -124,7 +124,7 @@ def delete_test_queues(queue_name=None, queue_num=None):
     
 
 if __name__ == '__main__':
-    create_test_queues('s3sync-worker', 100)
+    create_test_queues('s3sync-worker', 10)
     #create_test_queues('d3sync-worker', 2)
 
    # delete_test_queues('s3sync-worker', 100)
