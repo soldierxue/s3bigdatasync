@@ -4,6 +4,7 @@
 import boto3
 import gzip
 import json
+import os
 
 print("boto3.version [{}]".format(boto3.__version__))
 
@@ -34,7 +35,7 @@ def s3_download(bucket_name=None, key=None):
 
     print('{}: length:{}'.format(obj, obj.content_length))
 
-    dst='/tmp/{}'.format(key.split('/')[-1])
+    dst='/tmp/{}.{}'.format(key.split('/')[-1], os.getpid())
     obj.download_file(dst)
 
     print("DST: {}".format(dst))
