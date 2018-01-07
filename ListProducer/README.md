@@ -44,7 +44,11 @@
 # 运行过程
 ```Bash
 ./start.sh
+....
+=== Job description is at s3://leo-bjs-inventory-bucket/leodatacenter/leodatacenter/2017-12-30T08-00Z/job.json
 ```
+最后生成任务列表 job.json, 后续 TaskExcutor,TaskMonitor,UICenter 使用
+
 
 ```Bash
 暂时修改 ListProducer.py 中以下部分, 完成Job定义
