@@ -4,6 +4,7 @@
 from pprint import pprint
 from s3_utils import *
 from sqs_utils import *
+from urllib import unquote_plus
 import random
 
 # 0. Job
@@ -21,6 +22,10 @@ job_info = {
 object_key_list= ['totalObjects', 'totalObjectsSub1GB', 'totalObjectsSub5GB', 'totalObjectsSub10GB', 'totalObjectsSub50GB', 'totalObjectsSub100GB', 'totalObjectsSub1TB', 'totalObjectsSub5TB']
 # Inventory process
 
+
+def format_key(key):
+    return unquote_plus(key) 
+    
 def parse_inventory_data_file(data_file, job_info=None):
     msg_body=[]
 
@@ -42,7 +47,7 @@ def parse_inventory_data_file(data_file, job_info=None):
 
             item = {
                 'Bucket': src_bucket,
-                'Key'   : key,
+                'Key'   : format_key(key),
                 'Size'  : size,
                 'LastModifiedDate': sections[3].split('"')[1],
                 'ETag': sections[4].split('"')[1],
