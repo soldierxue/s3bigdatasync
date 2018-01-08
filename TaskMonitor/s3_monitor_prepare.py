@@ -65,7 +65,7 @@ def isDDBTableExist(tableName,profile='default'):
     try:
         # check whether or not the table is exist or not
         res = ddbClient.describe_table(TableName=tableName)
-        logger.info(json.dumps(res, cls=ComplexEncoder)) 
+        #logger.info(json.dumps(res, cls=ComplexEncoder)) 
         logger.info(" DDB Table is already exist, we will try to update the stack!")
         return True
     except ClientError as e:
@@ -200,7 +200,7 @@ def batchPutStatus(monitorItems,profile='default',tableName="s3cross_monitor"):
         session = boto3.Session(profile_name=profile)
         ddbClient = session.client('dynamodb')
         for req in batchRequests:
-            logger.info(json.dumps(req))
+            #logger.info(json.dumps(req))
             ddbClient.batch_write_item(
                 RequestItems=req
             )           
@@ -265,8 +265,8 @@ def main():
                 "ReplicationStatus":1                                                                                                                
         }                                
     ]
-    # prepareDDBResourceByCF("bjs")
-    batchPutStatus(testMonitorObjects,"bjs")
+    prepareDDBResourceByCF("bjs")
+    #batchPutStatus(testMonitorObjects,"bjs")
 
 if __name__ == "__main__":
     main()     
