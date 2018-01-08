@@ -11,7 +11,7 @@ import os
 import time
 from sys import argv
 
-SYS_VALUED_TYPES = ['-s3-bucket-name', '-ddb-table-name', '-project-host-region', '-frontend-speed-delay', '-iam-profile', '-ec2-key']
+SYS_VALUED_TYPES = ['-s3-bucket-name', '-ddb-table-name', '-project-host-region', '-frontend-speed-delay', '-iam-profile', '-ec2-key', '-s3-manifest-path']
 SYS_HELP_TYPES = ['-h', '--help']
 SYS_PARAMETERS_SET = {
     '-s3-bucket-name': 's3BucketName',
@@ -19,9 +19,11 @@ SYS_PARAMETERS_SET = {
     '-project-host-region': 'hostRegion',
     '-frontend-speed-delay': 'speedDelay',
     '-iam-profile': 'IAMProfile',
-    '-ec2-key': 'EC2Key'
+    '-ec2-key': 'EC2Key',
+    '-s3-manifest-path': 'S3ManifestPath'
 }
 
+S3ManifestPath = ''
 s3BucketName = 's3-big-data-sync'
 ddbTableName = 's3cross_stat'
 hostRegion = 'us-east-1'
@@ -199,7 +201,9 @@ def createServerSources(packagePath, keyName, region, profile):
     if (region == 'cn-north-1') or (region == 'cn-northwest-1'):
         location = '.' + region
         endpointSuffix = '.cn/'
-    userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \n python server.py \n'
+        userData = '#!/bin/sh \npip install boto3 -i http://pypi.douban.com/simple \npip install enum -i http://pypi.douban.com/simple \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \n python server.py \n'
+    else:
+        userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \n python server.py \n'
     
     if isStackExist(stackName, profile):
         try:
@@ -280,7 +284,8 @@ def createAndUploadBackEndPackage(profile):
         "bucket_name": s3BucketName,
         "table_name": ddbTableName,
         "region_id": hostRegion,
-        "speed_collect_delay": speedDelay
+        "speed_collect_delay": speedDelay,
+        "manifest_path": S3ManifestPath
     }, fp)
     fp.close()
     
