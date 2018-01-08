@@ -220,7 +220,7 @@ def statRunByScanItems(profile='default',monitorTableName="s3cross_monitor",inde
         beginTime = getFormatTimeSeconds(statMaxTime) 
         beginTimeFailItems = getFormatTimeSeconds(statMaxTime)
  
-    logger.info("Start to query all items whose replication time is greater or equals with %d (replication success) and %d (replication failed)",beginTime,beginTimeFailItems)
+    # logger.info("Start to query all items whose replication time is greater or equals with %d (replication success) and %d (replication failed)",beginTime,beginTimeFailItems)
     try:
         successIterator = None
         failedIterator = None
