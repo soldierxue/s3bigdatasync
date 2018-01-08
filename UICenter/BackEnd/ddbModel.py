@@ -16,8 +16,6 @@ class dataType(Enum):
     onlyStartTime = 4
 
 IAMSecurityUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/'
-objectKeyPathPrefix = 'aws-collections/aws-collections-inventory/'
-objectKeyPathSuffix = 'T08-00Z/manifest.json'
 validColumn = ['TimeUnit', 'StartTime', 'SuccessObjectNum', 'SuccessObjectSize', 'FailedObjectNum', 'FailedObjectSize']
 dataTypeResponse = [
     'TimeUnit, StartTime, SuccessObjectNum, SuccessObjectSize, FailedObjectNum, FailedObjectSize',
@@ -30,6 +28,7 @@ projectStartTime = metadataModel.getConfigurationValue('project_start_time')
 tableName = metadataModel.getConfigurationValue('table_name')
 bucketName = metadataModel.getConfigurationValue('bucket_name')
 speedCollectDelay = metadataModel.getConfigurationValue('speed_collect_delay')
+S3ManifestPath = metadataModel.getConfigurationValue('manifest_path')
 
 # Get Temporary Certificate for service.
 def getTemporaryCertificate(service):
@@ -56,30 +55,17 @@ def getTemporaryCertificate(service):
 # Input:    Request value [].
 # Output:   Response Dir.
 def getManifestDataFromS3(requestValue):
-    currentTimestamp = int(time.time())
-    todayTime = time.strftime("%Y-%m-%d", time.gmtime(currentTimestamp))
-    yesterdayTime = time.strftime("%Y-%m-%d", time.gmtime(currentTimestamp - 3600 * 24))
+    manifestBucketName = S3ManifestPath[:S3ManifestPath.index('/')]
+    manifestKeyPath = S3ManifestPath[(S3ManifestPath.index('/')+1):]
     responseDir = {}
     
     # client = boto3.client('s3')
     client = getTemporaryCertificate('s3')
     try:
-        client.download_file(bucketName, objectKeyPathPrefix + todayTime + objectKeyPathSuffix, 'manifest.json')
+        client.download_file(manifestBucketName, manifestKeyPath, 'manifest.json')
     except botocore.exceptions.ClientError as e:
-        try:
-            client.download_file(bucketName, objectKeyPathPrefix + yesterdayTime + objectKeyPathSuffix, 'manifest.json')
-        except botocore.exceptions.ClientError as ee:
-            return {}
-        else:
-            with open('manifest.json') as json_input:
-                data = json.load(json_input)
-
-            for item in requestValue:
-                if data.has_key(item):
-                    responseDir[item] = data[item]
-            
-            os.remove('manifest.json')
-            return responseDir
+        print "Error: Unvaild manifest path input."
+        exit(1)
     else:
         with open('manifest.json') as json_input:
             data = json.load(json_input)

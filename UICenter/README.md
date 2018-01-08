@@ -60,12 +60,17 @@ python ${Path}/install.py -h
 -ec2-key String_Value  
 设置启动的后端机器使用的Key名称，用于ssh登录ec2实例。如果设置此项，输入的Key名必须存在。  
 默认值： 无（默认不设置EC2 Key，即无法ssh登录）
+
+### 参数 s3-manifest-path
+-s3-manifest-path String_Value
+设置manifest 文件的路径，格式为 Bucket_name/Key_path。
+默认值： 无（如果不输入，会导致程序意外终止）
     
 ### 参数示例
 输入
     
 ```sh
-python ${Path}/install.py -iam-profile bjs -project-host-region cn-north-1 -ec2-key self-BJS
+python ${Path}/install.py -iam-profile bjs -project-host-region cn-north-1 -ec2-key self-BJS -s3-manifest-path leo-bjs-inventory-bucket/leodatacenter/leodatacenter/2017-12-30T08-00Z/job.json
 ```
     
 输出
