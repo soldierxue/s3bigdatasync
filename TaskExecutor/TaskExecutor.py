@@ -69,14 +69,15 @@ def check_queue(qurl, dead_queue):
                 "StorageClass": action['StorageClass'],
                 "Key": action['Key'],
                 "Size": action['Size'],
-                "IsMultipartUploaded": IsMultipartUploaded,
-                "ReplicationStatus": ReplicationStatus
+                "IsMultipartUploaded": IsMultipartUploaded
             }
 
             if s3_copy(src_bucket, dst_bucket, key):
                 print('s3_copy({0}, {1}, {2} ok'.format(src_bucket, dst_bucket, key))
+                item_log['ReplicationStatus']=1
             else:
                 print('s3_copy({0}, {1}, {2} failed'.format(src_bucket, dst_bucket, key))
+                item_log['ReplicationStatus']=0
                 # Just send the failed part to dead queue to verify, and make the job never failed
                 #success=False
                 send_msg_to_sqs(dead_queue, action)
