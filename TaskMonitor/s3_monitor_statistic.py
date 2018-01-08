@@ -193,7 +193,16 @@ def getStatCategories(beginTime):
             ,"SuccessObjectSize":0
             ,"SuccessObjectNum":0
             ,"ObjectKeys":[]
-        }            
+        } 
+        ,{
+            "StartTime":getFormatTimeSeconds(beginTime)
+            ,"TimeUnit":60
+            ,"FailedObjectSize":0
+            ,"FailedObjectNum":0
+            ,"SuccessObjectSize":0
+            ,"SuccessObjectNum":0
+            ,"ObjectKeys":[]
+        }                   
     ]
     return cats
 
@@ -283,7 +292,12 @@ def countStatItems(iterator,beginTime,profile,tableName):
                         elif rstatus == "0":
                             cat['FailedObjectSize'] = osize
                             cat['FailedObjectNum'] = 1      
+        for cat in statMatrix:  
+            if cat['SuccessObjectNum'] >= 1 or cat['FailedObjectNum'] >= 1:
+                logger.info("There are success or failed objects need to be added to statistic data#")
+                statItems.append(cat.copy())
     
+
     logger.info("Items#"+json.dumps(statItems))
 
 # 获取 Monitor Table 最小的Time值，默认是当前时间
@@ -342,7 +356,7 @@ def private_GetTimestamp(keyName,keyValue,profile='default',tableName="s3cross_m
 
 def main():
     logger.info("**** Monitoring S3 Copying Progress - Statistic *****! ")
-    statRunByScanItems("bjs")
+    statRunByScanItems()
 
 if __name__ == "__main__":
     main()     
