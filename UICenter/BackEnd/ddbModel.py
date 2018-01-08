@@ -231,15 +231,15 @@ def returnTotalProgressData():
         
         manifest = getManifestDataFromS3(['statistics'])
         if manifest != {}:
-            returnData['totalSize'] = manifest['statistics']['totalObjectsSizeGB'] * 1000000000
+            returnData['totalSize'] = manifest['statistics']['totalObjectsSizeBytes']
             returnData['totalObjects'] = manifest['statistics']['totalObjects']
             returnData['successSize'] = 0
             returnData['successObjects'] = 0
         else:
             return {}
         
-        success60MData = queryByAttr(60, dataType.onlySuccess, -1)
-        for item in success60MData:
+        success1MData = queryByAttr(1, dataType.onlySuccess, -1)
+        for item in success1MData:
             returnData['successSize'] += int(item['SuccessObjectSize']['N'])
             returnData['successObjects'] += int(item['SuccessObjectNum']['N'])
             
@@ -253,7 +253,7 @@ def returnTotalProgressData():
     else:
         return {}
         
-def returnTasksGraphData():
+def returnDayTasksGraphData():
     currentDayTimestamp = int(time.time()) / 3600 / 24 * 3600 * 24
     
     # Batch get items in DynamoDB
@@ -273,6 +273,31 @@ def returnTasksGraphData():
         itemStartTime = int(item['StartTime']['N'])
         returnData['successObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['SuccessObjectNum']['N'])
         returnData['failureObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['FailedObjectNum']['N'])
+        
+    return returnData
+    
+def returnTasksGraphData():
+    currentHourTimestamp = int(time.time()) / 3600 * 3600
+    
+    # Batch get items in DynamoDB
+    data = []
+    for i in xrange(60):
+        data.append({
+            'TimeUnit': createDDBNumberFormat(1),
+            'StartTime': createDDBNumberFormat(currentHourTimestamp + i * 60)
+        })
+    response = batchGetItemsByArray(data)
+    
+    returnData = {'successObjects': [], 'failureObjects': []}
+    for i in xrange(60):
+        returnData['successObjects'].append(0)
+        returnData['failureObjects'].append(0)
+    for item in response:
+        itemStartTime = int(item['StartTime']['N'])
+        if item.has_key('SuccessObjectNum'):
+            returnData['successObjects'][(itemStartTime - currentHourTimestamp) / 60] = int(item['SuccessObjectNum']['N'])
+        if item.has_key('FailedObjectNum'):
+            returnData['failureObjects'][(itemStartTime - currentHourTimestamp) / 60] = int(item['FailedObjectNum']['N'])
         
     return returnData
 
