@@ -227,6 +227,8 @@ def statRunByScanItems(profile='default',monitorTableName="s3cross_monitor",inde
         if beginTime is not None:
             successIterator = getIterator(beginTime,"1",profile,monitorTableName,indexMonitor)
         if beginTimeFailItems is not None:
+            if beginTime is None:
+                beginTime = beginTimeFailItems
             failedIterator = getIterator(beginTime,"0",profile,monitorTableName,indexMonitor)
     
         if successIterator is not None:
