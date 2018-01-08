@@ -7,7 +7,7 @@ function loadTasksGraph() {
     // The number of series.
     var seriesNumber = 2,
     // The number of values per series.
-    seriesValue = 24,
+    seriesValue = 60,
     // The colors used in the graph.
     colors = [d3.schemeCategory20c[0], d3.schemeCategory20c[4]];
     // Calc width and height in the graph.
@@ -19,7 +19,7 @@ function loadTasksGraph() {
     // Each yz[i] is an array of seriesValue non-negative numbers representing a y-value for xz[i].
     // The y01z array has the same structure as yz, but with stacked [y₀, y₁] instead of y.
     var xz = d3.range(seriesValue),
-    x00z = xz.map(function(x) { return x + ":00"; }),
+    x00z = xz.map(function(x) { return x; }),
     // yz = d3.range(seriesNumber).map(function() { return bumps(seriesValue); }),
     yz = tasksGraphData,
     y01z = d3.stack().keys(d3.range(seriesNumber))(d3.transpose(yz)),
@@ -101,7 +101,7 @@ function loadTasksGraph() {
     translateValue = parseFloat(translateValue) + parseFloat(translateValue) - parseFloat(translateValue2) - 6;
     transformValue = transformValue.substring(0, transformValue.indexOf("(") + 1) + translateValue + transformValue.substring(transformValue.indexOf(","), transformValue.length);
     node.setAttribute("transform", transformValue);
-    node.children[1].innerHTML = "24:00";
+    node.children[1].innerHTML = "60";
     d3.select(".tasksgraph-axis--x")._groups[0][0].appendChild(node);
 
     // Change the default status to grouped.
