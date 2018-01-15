@@ -201,9 +201,9 @@ def createServerSources(packagePath, keyName, region, profile):
     if (region == 'cn-north-1') or (region == 'cn-northwest-1'):
         location = '.' + region
         endpointSuffix = '.cn/'
-        userData = '#!/bin/sh \npip install boto3 -i http://pypi.douban.com/simple \npip install enum -i http://pypi.douban.com/simple \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \n python server.py \n'
+        userData = '#!/bin/sh \npip install boto3 -i http://pypi.douban.com/simple \npip install enum -i http://pypi.douban.com/simple \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \n./keep_alive.sh >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh >> server.log" >> /etc/rc.d/rc.local'
     else:
-        userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \n python server.py \n'
+        userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \n./keep_alive.sh >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh >> server.log" >> /etc/rc.d/rc.local \n'
     
     if isStackExist(stackName, profile):
         try:
@@ -346,7 +346,7 @@ def createBackEndInEC2(profile='default', key=''):
             backEndEIP = item['OutputValue']
     
     fp = file('./configuration.js', 'w')
-    fp.write('const BytesConverterNumber = 1000;const APIEndpoint = "http://' + backEndEIP + ':8000/"\n');
+    fp.write('const BytesConverterNumber = 1000;const APIEndpoint = "http://' + backEndEIP + ':80/"\n');
     fp.close()
     
     uploadFileToS3('./configuration.js', 'assets/js/configuration.js', s3BucketName, profile)

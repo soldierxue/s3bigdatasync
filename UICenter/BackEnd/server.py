@@ -1,3 +1,6 @@
+#!/bin/python
+# coding=utf-8
+
 import BaseHTTPServer
 import ddbModel
 import sys
@@ -42,7 +45,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         print json.dumps(ddbModel.returnTasksGraphData())
 
 def main():
-    PORT = 8000
+    PORT = 80
     httpd = BaseHTTPServer.HTTPServer(("", PORT), Handler)
     print "serving at port", PORT
     httpd.serve_forever()
