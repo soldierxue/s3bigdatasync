@@ -2,8 +2,7 @@
 
 num=1
 iNum=0
-#path=/var/s3bigdatasync/BackEnd/
-path=/Users/davwan/Desktop/Projects/CS-EAST-SA/s3bigdatasync/UICenter/BackEnd/
+path=/var/s3bigdatasync/BackEnd/
 echo $$
 while(( $num < 5 ))
 do
