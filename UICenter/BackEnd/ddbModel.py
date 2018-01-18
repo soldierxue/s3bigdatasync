@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# coding=utf-8
+
 import boto3
 import botocore
 import urllib2
@@ -27,7 +30,6 @@ dataTypeResponse = [
 projectStartTime = metadataModel.getConfigurationValue('project_start_time')
 tableName = metadataModel.getConfigurationValue('table_name')
 bucketName = metadataModel.getConfigurationValue('bucket_name')
-speedCollectDelay = metadataModel.getConfigurationValue('speed_collect_delay')
 S3ManifestPath = metadataModel.getConfigurationValue('manifest_path')
 
 # Get Temporary Certificate for service.
@@ -59,7 +61,6 @@ def getManifestDataFromS3(requestValue):
     manifestKeyPath = S3ManifestPath[(S3ManifestPath.index('/')+1):]
     responseDir = {}
     
-    # client = boto3.client('s3')
     client = getTemporaryCertificate('s3')
     try:
         client.download_file(manifestBucketName, manifestKeyPath, 'manifest.json')
@@ -81,7 +82,6 @@ def getManifestDataFromS3(requestValue):
 # Input:    Array. All actions.
 # Output:   Response.
 def batchGetItemsByArray(data):
-    # client = boto3.client('dynamodb')
     client = getTemporaryCertificate('dynamodb')
     
     response = client.batch_get_item(
@@ -98,7 +98,6 @@ def batchGetItemsByArray(data):
 # Input:    Array. All actions.
 # Output:   Dir. Failure actions. 
 def batchWriteItemsByArray(data):
-    # client = boto3.client('dynamodb')
     client = getTemporaryCertificate('dynamodb')
     
     response = client.batch_write_item(
@@ -111,7 +110,6 @@ def batchWriteItemsByArray(data):
 
 # Get DDB Item by attributes.
 def getItemByAttr(timeUnit, startTime, dataRange):
-    # client = boto3.client('dynamodb')
     client = getTemporaryCertificate('dynamodb')
     
     response = client.get_item(
@@ -132,7 +130,6 @@ def getItemByAttr(timeUnit, startTime, dataRange):
 # Input:    timeUnit, dataRange(dataType.enum), limit(-1: All).
 # Output:   Query response.
 def queryByAttr(timeUnit, dataRange, limit=100):
-    # client = boto3.client('dynamodb')
     client = getTemporaryCertificate('dynamodb')
     
     if limit != -1:
@@ -231,50 +228,26 @@ def returnTotalProgressData():
         
         manifest = getManifestDataFromS3(['statistics'])
         if manifest != {}:
-            returnData['totalSize'] = manifest['statistics']['totalObjectsSizeBytes']
-            returnData['totalObjects'] = manifest['statistics']['totalObjects']
-            returnData['successSize'] = 0
-            returnData['successObjects'] = 0
-        else:
-            return {}
-        
+            if manifest['statistics'].has_key('totalObjectsSizeBytes'):
+                returnData['totalSize'] = manifest['statistics']['totalObjectsSizeBytes']
+            if manifest['statistics'].has_key('totalObjects'):
+                returnData['totalObjects'] = manifest['statistics']['totalObjects']
+
+        returnData['successSize'] = 0
+        returnData['successObjects'] = 0
         success1MData = queryByAttr(1, dataType.onlySuccess, -1)
         for item in success1MData:
             returnData['successSize'] += int(item['SuccessObjectSize']['N'])
             returnData['successObjects'] += int(item['SuccessObjectNum']['N'])
             
-        itemResponse = getItemByAttr(1, currentTimestamp - speedCollectDelay * 60, dataType.onlySuccessSize)
-        if itemResponse == {}:
-            returnData['estimateSpeed'] = int(getItemByAttr(1, projectStartTime, dataType.onlySuccessSize)['SuccessObjectSize']['N'])
+        if (currentTimestamp != projectStartTime):
+            returnData['estimateSpeed'] = returnData['successSize'] / ((currentTimestamp - projectStartTime) / 60)
         else:
-            returnData['estimateSpeed'] = int(itemResponse['SuccessObjectSize']['N'])
+            returnData['estimateSpeed'] = 0
             
         return returnData
     else:
         return {}
-        
-def returnDayTasksGraphData():
-    currentDayTimestamp = int(time.time()) / 3600 / 24 * 3600 * 24
-    
-    # Batch get items in DynamoDB
-    data = []
-    for i in xrange(24):
-        data.append({
-            'TimeUnit': createDDBNumberFormat(60),
-            'StartTime': createDDBNumberFormat(currentDayTimestamp + i * 3600)
-        })
-    response = batchGetItemsByArray(data)
-    
-    returnData = {'successObjects': [], 'failureObjects': []}
-    for i in xrange(24):
-        returnData['successObjects'].append(0)
-        returnData['failureObjects'].append(0)
-    for item in response:
-        itemStartTime = int(item['StartTime']['N'])
-        returnData['successObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['SuccessObjectNum']['N'])
-        returnData['failureObjects'][(itemStartTime - currentDayTimestamp) / 3600] = int(item['FailedObjectNum']['N'])
-        
-    return returnData
     
 def returnTasksGraphData():
     currentHourTimestamp = int(time.time()) / 3600 * 3600
@@ -303,19 +276,14 @@ def returnTasksGraphData():
 
 # Create test data in DDB.
 def createTestDataToS3AndDDB():
-    testHourLength = 5
-    testHourLengthPredict = 3
-    currentTimestamp = int(time.time())
-    
-    # Create manifest to S3
-    testStartTimestamp = currentTimestamp - 3600 * testHourLength
-    testStartTimeDay = time.strftime("%Y-%m-%d", time.gmtime(testStartTimestamp))
+    # Create manifest file to S3
     manifestJson = {
         'sourceBucket': 'test-source-bucket',
         'destinationBucket': 'test-destination-bucket',
         'statistics': {
             'totalObjects': 2294893,
-            'totalObjectsSizeGB': 22985
+            'totalObjectsSizeGB': 22985,
+            'totalObjectsSizeBytes': 22985000000000
         },
         'fileFormat' : 'json'
     }
@@ -324,28 +292,74 @@ def createTestDataToS3AndDDB():
     json.dump(manifestJson, fp)
     fp.close()
     
-    s3 = boto3.resource('s3')
-    s3.meta.client.upload_file('test.json', bucketName, objectKeyPathPrefix + testStartTimeDay + objectKeyPathSuffix)
+    fp = file('test.json', 'r')
+    s3 = getTemporaryCertificate('s3')
+    s3.put_object(
+        ACL = 'public-read',
+        Body = fp,
+        Bucket = bucketName,
+        Key = 'tmp/manifest.json',
+        ContentType = 'binary/octet-stream'
+    )
+    fp.close()
     os.remove('test.json')
+    global S3ManifestPath
+    S3ManifestPath = bucketName + '/tmp/manifest.json'
+    metadataModel.updateConfigurationValue('manifest_path', S3ManifestPath)
     
-    # Create items in DynamoDB
-    data = []
-    for i in xrange(testHourLength + testHourLengthPredict):
-        data.append({
-            'PutRequest': {
-                'Item': createDDBDataFormat(60, testStartTimestamp / 3600 * 3600 + i * 3600)
+    ddb = getTemporaryCertificate('dynamodb')
+    try:
+        ddb.delete_table(
+            TableName='s3cross_stat'
+        )
+    except:
+        print "Can't find dynamodb table."
+    else:
+        time.sleep(20)
+    ddb.create_table(
+        AttributeDefinitions=[
+            {
+                'AttributeName': 'TimeUnit',
+                'AttributeType': 'N'
+            },
+            {
+                'AttributeName': 'StartTime',
+                'AttributeType': 'N'
             }
-        })
-    batchWriteItemsByArray(data)
+        ],
+        TableName='s3cross_stat',
+        KeySchema=[
+            {
+                'AttributeName': 'TimeUnit',
+                'KeyType': 'HASH'
+            },
+            {
+                'AttributeName': 'StartTime',
+                'KeyType': 'RANGE'
+            }
+        ],
+        ProvisionedThroughput={
+            'ReadCapacityUnits': 5,
+            'WriteCapacityUnits': 5
+        }
+    )
+    time.sleep(20)
     
-    for i in xrange(3 * testHourLengthPredict + 3 * testHourLength):
+    loadTimestamp = int(time.time()) / 60 * 60
+    lastTimestamp = loadTimestamp - 60
+    while True:
         data = []
-        for j in xrange(20):
+        if loadTimestamp != lastTimestamp:
             data.append({
                 'PutRequest': {
-                    'Item': createDDBDataFormat(1, testStartTimestamp / 60 * 60 + (i * 20 + j) * 60)
+                    'Item': createDDBDataFormat(1, loadTimestamp)
                 }
             })
-        batchWriteItemsByArray(data)
+            batchWriteItemsByArray(data)
+        
+        time.sleep(20)
+        lastTimestamp = loadTimestamp
+        loadTimestamp = int(time.time()) / 60 * 60
 
-# createTestDataToS3AndDDB()
+if __name__ == "__main__":
+    createTestDataToS3AndDDB()
