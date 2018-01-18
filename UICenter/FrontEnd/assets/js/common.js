@@ -1,4 +1,4 @@
-var data = {};
+var progressData = {};
 
 function getTotalProgressValueFromDDB(callback) {
     if (window.XMLHttpRequest) {
@@ -10,48 +10,49 @@ function getTotalProgressValueFromDDB(callback) {
     
     obj.onreadystatechange = function() {
         if (obj.readyState == 4 && (obj.status == 200 || obj.status == 304 || obj.status == 201)) {
-            if (obj.responseText != "{}") {
-                data = eval("(" + obj.responseText + ")");
-                console.log(data);
-                
-                callback();
+            if (obj.responseText != "{}\n") {
+                progressData = eval("(" + obj.responseText + ")");
+                console.log(progressData);
+            } else {
+                console.log({})
             }
+            callback();
         }
     };
     obj.send(null);
 }
 
 function updateTotalProgress() {
-    if (data != {}) {
-        var successSizeData = getNumberAndUnitFromBytes(data.successSize);
+    if (JSON.stringify(progressData) != "{}") {
+        var successSizeData = getNumberAndUnitFromBytes(progressData.successSize);
         document.getElementById("success-progress-size").innerHTML = successSizeData[0];
         document.getElementById("success-progress-unit").innerHTML = successSizeData[1];
         
-        var totalSizeData = getNumberAndUnitFromBytes(data.totalSize);
+        var totalSizeData = getNumberAndUnitFromBytes(progressData.totalSize);
         document.getElementById("total-progress-size").innerHTML = totalSizeData[0];
         document.getElementById("total-progress-unit").innerHTML = totalSizeData[1];
         
-        var progressPercent = Math.round(data.successSize / data.totalSize * 100);
+        var progressPercent = Math.round(progressData.successSize / progressData.totalSize * 100);
         document.getElementById("total-progress-bar").setAttribute("aria-valuenow", progressPercent);
         document.getElementById("total-progress-bar").style.width = progressPercent + "%";
         document.getElementById("total-progress-bar").innerHTML = progressPercent + "%";
         
-        var estimateSpeedData = getNumberAndUnitFromBytes(data.estimateSpeed);
+        var estimateSpeedData = getNumberAndUnitFromBytes(progressData.estimateSpeed);
         document.getElementById("current-speed-value").innerHTML = estimateSpeedData[0];
         document.getElementById("current-speed-unit").innerHTML = estimateSpeedData[1] + " / min";
         
         var startTime = new Date();
-        startTime.setTime(data.startTime * 1000);
+        startTime.setTime(progressData.startTime * 1000);
         document.getElementById("start-time").innerHTML = startTime.Format("yyyy/MM/dd hh:mm");
         
-        if (data.successSize == data.totalSize) {
+        if (progressData.successSize == progressData.totalSize) {
             document.getElementById("project-status").innerHTML = "Success";
 
             document.getElementById("expected-end-time").innerHTML = "NaN";
         } else {
             document.getElementById("project-status").innerHTML = "In progress";
             
-            estimateTimeNeeded = (data.totalSize - data.successSize) / data.estimateSpeed * 60;
+            estimateTimeNeeded = (progressData.totalSize - progressData.successSize) / progressData.estimateSpeed * 60;
             if (estimateTimeNeeded > 86400) {
                 document.getElementById("expected-end-time").innerHTML = "NaN";
             } else {
@@ -64,8 +65,8 @@ function updateTotalProgress() {
             }
         }
         
-        document.getElementById("transfered-objects").innerHTML = data.successObjects;
-        document.getElementById("total-objects").innerHTML = data.totalObjects;
+        document.getElementById("transfered-objects").innerHTML = progressData.successObjects;
+        document.getElementById("total-objects").innerHTML = progressData.totalObjects;
     } else {
         document.getElementById("project-status").innerHTML = "Pending";
     }

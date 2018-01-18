@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/python
 # coding=utf-8
 
 import boto3
@@ -9,27 +9,33 @@ import commands
 import json
 import os
 import time
-from sys import argv
+import sys
+import argparse
 
-SYS_VALUED_TYPES = ['-s3-bucket-name', '-ddb-table-name', '-project-host-region', '-frontend-speed-delay', '-iam-profile', '-ec2-key', '-s3-manifest-path']
-SYS_HELP_TYPES = ['-h', '--help']
-SYS_PARAMETERS_SET = {
-    '-s3-bucket-name': 's3BucketName',
-    '-ddb-table-name': 'ddbTableName',
-    '-project-host-region': 'hostRegion',
-    '-frontend-speed-delay': 'speedDelay',
-    '-iam-profile': 'IAMProfile',
-    '-ec2-key': 'EC2Key',
-    '-s3-manifest-path': 'S3ManifestPath'
-}
+AllowedModes = ['prod', 'test']
+AllowedSelections = ['all', 's3-frontend', 'ec2-backend']
 
-S3ManifestPath = ''
-s3BucketName = 's3-big-data-sync'
-ddbTableName = 's3cross_stat'
-hostRegion = 'us-east-1'
-IAMProfile = 'default'
-EC2Key = ''
-speedDelay = 10
+# Read in command-line parameters
+parser = argparse.ArgumentParser()
+parser.add_argument("-m", "-manifest", "--s3-manifest-path", action="store", required=True, dest="S3ManifestPath", help="Your S3 manifest file path. Format: Bucket_Name/Key_Path.")
+parser.add_argument("-b", "-bucket", "--s3-bucket-name", action="store", dest="S3BucketName", default="s3-big-data-sync", help="The S3 bucket which used to host the front end website. If you choose to create it, you need NOT to care whether the bucket exists since we will add unique suffix.")
+parser.add_argument("-t", "-table", "--ddb-table-name", action="store", dest="DDBTableName", default="s3cross_stat", help="The S3 monitor status dynamoDB table, which has been created by model TaskMonitor.")
+parser.add_argument("-r", "-region", "--project-host-region", action="store", dest="ProjectHostRegion", default="cn-north-1", help="The region name which you choose to host this project, for example: us-east-1.")
+parser.add_argument("-p", "-profile", "--iam-profile", action="store", dest="IAMProfile", default="default", help="The IAM Profile to run the install.py script. You can run 'aws configure --profile $your_profile_name' to set a new profile or use a exist one.")
+parser.add_argument("-k", "-key", "--ec2-key", action="store", dest="EC2Key", default="", help="The EC2 key which used to ssh to ec2 backend instance. If you need to ssh to the server, please make sure set this parameter correctly.")
+parser.add_argument("-M", "-mode", "--project-mode", action="store", dest="ProjectMode", choices=AllowedModes, default="prod", help="The project mode which determine the install.py script action type. You can choose a type in %s. If you choose 'test' mode, which means to test UICenter, we will create many test data in DDB and S3."%str(AllowedModes))
+parser.add_argument("-s", "-selection", "--project-selection", action="store", dest="ProjectSelection", choices=AllowedSelections, default="all", help="The project selection means to select what part needed to install. You can choose a selection in %s."%str(AllowedSelections))
+
+args = parser.parse_args()
+S3ManifestPath = args.S3ManifestPath
+S3BucketName = args.S3BucketName
+ddbTableName = args.DDBTableName
+hostRegion = args.ProjectHostRegion
+IAMProfile = args.IAMProfile
+EC2Key = args.EC2Key
+projectMode = args.ProjectMode
+projectSelection = args.ProjectSelection
+
 
 # Create Random String.
 # Input:    String length.
@@ -187,7 +193,7 @@ def getStackOutput(stackID, profile):
 # Create Back-End Server Sources by CloudFormation.
 # Input:    String package path (Back-End tar package). String region. String profile.
 # Output:   String CloudFormation stack ID.
-def createServerSources(packagePath, keyName, region, profile):
+def createServerSources(packagePath, keyName, region, profile, mode):
     session = boto3.Session(profile_name = profile)
     client = session.client('cloudformation')
     
@@ -201,40 +207,18 @@ def createServerSources(packagePath, keyName, region, profile):
     if (region == 'cn-north-1') or (region == 'cn-northwest-1'):
         location = '.' + region
         endpointSuffix = '.cn/'
-        userData = '#!/bin/sh \npip install boto3 -i http://pypi.douban.com/simple \npip install enum -i http://pypi.douban.com/simple \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \nchmod u+x server.py \n./keep_alive.sh >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh >> server.log" >> /etc/rc.d/rc.local'
+        userData = '#!/bin/sh \npip install boto3 -i http://pypi.douban.com/simple \npip install enum -i http://pypi.douban.com/simple \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + S3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \nchmod u+x server.py \n./keep_alive.sh ' + mode + ' >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh ' + mode + ' >> server.log" >> /etc/rc.d/rc.local'
     else:
-        userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + s3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \nchmod u+x server.py \n./keep_alive.sh >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh >> server.log" >> /etc/rc.d/rc.local \n'
+        userData = '#!/bin/sh \npip install boto3 \npip install enum \nwget https://s3' + location + '.amazonaws.com' + endpointSuffix + S3BucketName + '/' + packagePath + ' \nmkdir /var/s3bigdatasync \nmv backend.tar.gz /var/s3bigdatasync/backend.tar.gz \ncd /var/s3bigdatasync/ \n tar -zxvf backend.tar.gz \ncd BackEnd \nchmod u+x keep_alive.sh \nchmod u+x server.py \n./keep_alive.sh ' + mode + ' >> server.log \necho "/var/s3bigdatasync/BackEnd/keep_alive.sh ' + mode + ' >> server.log" >> /etc/rc.d/rc.local \n'
     
-    if isStackExist(stackName, profile):
-        try:
-            response = client.update_stack(
-                StackName = stackName,
+    for i in xrange(10):
+        newStackName = stackName + '-' + createRandomString(14)
+        
+        if not isStackExist(newStackName, profile):
+            response = client.create_stack(
+                StackName = newStackName,
                 TemplateBody = fileBody,
                 Parameters = [
-                    {
-                        'ParameterKey': 'KeyName',
-                        'ParameterValue': keyName
-                    },
-                    {
-                        'ParameterKey': 'UserData',
-                        'ParameterValue': userData
-                    }
-                ],
-                Capabilities = [
-                    'CAPABILITY_IAM'
-                ],
-                OnFailure = 'ROLLBACK',
-                EnableTerminationProtection = False
-            )
-            
-            return response['StackId']
-        except:
-            print "Already there."
-    else:
-        response = client.create_stack(
-            StackName = stackName,
-            TemplateBody = fileBody,
-            Parameters = [
                 {
                     'ParameterKey': 'KeyName',
                     'ParameterValue': keyName
@@ -243,14 +227,14 @@ def createServerSources(packagePath, keyName, region, profile):
                     'ParameterKey': 'UserData',
                     'ParameterValue': userData
                 }
-            ],
-            Capabilities = [
-                'CAPABILITY_IAM'
-            ],
-            OnFailure = 'ROLLBACK'
-        )
+                ],
+                Capabilities = [
+                    'CAPABILITY_IAM'
+                ],
+                OnFailure = 'ROLLBACK'
+            )
         
-        return response['StackId']
+            return response['StackId']
 
 # Get All File Name And File Path From Folder Path.
 # Input:    String root path.
@@ -281,18 +265,16 @@ def createAndUploadBackEndPackage(profile):
     fp = file('./BackEnd/metadata.json', 'w')
     json.dump({
         'project_start_time': 0,
-        "bucket_name": s3BucketName,
+        "bucket_name": S3BucketName,
         "table_name": ddbTableName,
         "region_id": hostRegion,
-        "speed_collect_delay": speedDelay,
         "manifest_path": S3ManifestPath
     }, fp)
     fp.close()
     
     (status, output) = commands.getstatusoutput('tar -zcvf ./backend.tar.gz ./BackEnd')
     if status == 0:
-        uploadFileToS3('./backend.tar.gz', 'tmp/backend.tar.gz', s3BucketName, profile)
-        # makeS3FilePublic('tmp/backend.tar.gz', s3BucketName, profile)
+        uploadFileToS3('./backend.tar.gz', 'tmp/backend.tar.gz', S3BucketName, profile)
         commands.getstatusoutput('rm backend.tar.gz')
         commands.getstatusoutput('rm ./BackEnd/metadata.json')
         
@@ -302,10 +284,10 @@ def createAndUploadBackEndPackage(profile):
 # Input:    String profile.
 # Output:   Void.
 def createFrontEndInS3(profile='default'):
-    global s3BucketName
-    bucketName = createS3Bucket(s3BucketName, hostRegion, profile)
-    s3BucketName = bucketName
-    putS3BucketWebsite(s3BucketName, profile)
+    global S3BucketName
+    bucketName = createS3Bucket(S3BucketName, hostRegion, profile)
+    S3BucketName = bucketName
+    putS3BucketWebsite(S3BucketName, profile)
     
     fileData = getFileNameAndFilePathFrom('./FrontEnd')
     
@@ -314,14 +296,13 @@ def createFrontEndInS3(profile='default'):
         targetPath = sourcePath[11:]
         
         uploadFileToS3(sourcePath, targetPath, bucketName, profile)
-        # makeS3FilePublic(targetPath, bucketName, profile)
 
 # Create Back End In EC2.
 # Input:    String profile.
 # Output:   Void.
-def createBackEndInEC2(profile='default', key=''):
+def createBackEndInEC2(profile='default', key='', mode='prod'):
     packagePath = createAndUploadBackEndPackage(profile)
-    stackID = createServerSources(packagePath, key, hostRegion, profile)
+    stackID = createServerSources(packagePath, key, hostRegion, profile, mode)
     
     print 'Stack start, please wait for about 5 mins.'
     time.sleep(180)
@@ -349,56 +330,25 @@ def createBackEndInEC2(profile='default', key=''):
     fp.write('const BytesConverterNumber = 1000;const APIEndpoint = "http://' + backEndEIP + ':80/"\n');
     fp.close()
     
-    uploadFileToS3('./configuration.js', 'assets/js/configuration.js', s3BucketName, profile)
-    # makeS3FilePublic('assets/js/configuration.js', s3BucketName, profile)
+    uploadFileToS3('./configuration.js', 'assets/js/configuration.js', S3BucketName, profile)
     commands.getstatusoutput('rm configuration.js')
 
 def main():
-    createFrontEndInS3(IAMProfile)
-    createBackEndInEC2(IAMProfile, EC2Key)
+    if (projectSelection == 'all') or (projectSelection == 's3-frontend'):
+        createFrontEndInS3(IAMProfile)
+    if (projectSelection == 'all') or (projectSelection == 'ec2-backend'):
+        createBackEndInEC2(IAMProfile, EC2Key, projectMode)
     
-    print "UICenter is installed successfully."
+    print
+    print "UICenter is installed successfully!"
+    print "--------------------------------------------------------------------------------"
     location = getLocationByRegion(hostRegion)
     if location != '':
         location = '-' + location
     if (hostRegion == 'cn-north-1') or (hostRegion == 'cn-northwest-1'):
-        print "WebsiteURL: http://" + s3BucketName + ".s3-website." + hostRegion + ".amazonaws.com.cn/"
+        print "WebsiteURL: http://" + S3BucketName + ".s3-website." + hostRegion + ".amazonaws.com.cn/"
     else:
-        print "WebsiteURL: http://" + s3BucketName + ".s3-website" + location + ".amazonaws.com/"
-
-def help_messages():
-    print "Message: please read README.md file for more details. "
-
-def error_with_argv(value):
-    print "Error: Wrong sys argv input between value: " + value
-    
-def error_messages():
-    print "Error: Invalid sys argv input."
+        print "WebsiteURL: http://" + S3BucketName + ".s3-website" + location + ".amazonaws.com/"
 
 if __name__ == "__main__":
-    if (len(argv) == 2) and (argv[1] in SYS_HELP_TYPES):
-        help_messages()
-    elif (len(argv) == 1):
-        main()
-    elif (len(argv) % 2 == 1):
-        flag = ''
-        isError = False
-        for i in xrange(1, len(argv)):
-            if (i % 2 == 0) and (flag == ''):
-                error_with_argv(argv[i-1])
-                isError = True
-                break
-            elif (i % 2 == 1) and (argv[i] in SYS_VALUED_TYPES):
-                flag = argv[i]
-            elif (i % 2 == 1):
-                error_with_argv(argv[i])
-                isError = True
-                break
-            else:
-                locals()[SYS_PARAMETERS_SET[flag]] = argv[i]
-                flag = ''
-        
-        if not isError:
-            main()
-    else:
-        error_messages()
+    main()
