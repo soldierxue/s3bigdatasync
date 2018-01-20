@@ -92,13 +92,13 @@ function loadTasksGraph() {
     .attr("x", -xAxis.bandwidth()/2);
 
     // Add 24:00 x axis tag at the right.
-    var node = d3.select(".tasksgraph-axis--x").selectAll("g")._groups[0][23].cloneNode(true),
-    node2 = d3.select(".tasksgraph-axis--x").selectAll("g")._groups[0][22].cloneNode(true),
+    var node = d3.select(".tasksgraph-axis--x").selectAll("g")._groups[0][59].cloneNode(true),
+    node2 = d3.select(".tasksgraph-axis--x").selectAll("g")._groups[0][58].cloneNode(true),
     transformValue = node.getAttribute("transform"),
     transformValue2 = node2.getAttribute("transform"),
     translateValue = transformValue.substring(transformValue.indexOf("(") + 1, transformValue.indexOf(",")),
     translateValue2 = transformValue2.substring(transformValue2.indexOf("(") + 1, transformValue2.indexOf(","));
-    translateValue = parseFloat(translateValue) + parseFloat(translateValue) - parseFloat(translateValue2) - 6;
+    translateValue = parseFloat(translateValue) + parseFloat(translateValue) - parseFloat(translateValue2);
     transformValue = transformValue.substring(0, transformValue.indexOf("(") + 1) + translateValue + transformValue.substring(transformValue.indexOf(","), transformValue.length);
     node.setAttribute("transform", transformValue);
     node.children[1].innerHTML = "60";
