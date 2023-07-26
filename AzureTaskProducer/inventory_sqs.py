@@ -23,13 +23,8 @@ is_local_debug = False # 是否是本地调试
 is_limit_debug = True # 是否通过MAX_INVENTORY_NUM，MAX_OBJ_TOTAL_NUM 或 MAX_OBJ_TOTAL_SIZE 三者来控制提交消息的数量
 region = "us-east-2"
 sqs_queue = "https://sqs.us-east-2.amazonaws.com/188869792837/recode_msg_test"
-azure_storage_account = "https://foxstorageaccount.blob.core.windows.net/"
 
 # global variables
-
-manifestFiles = []
-inventoryInfo = {}
-inventoryCSVFiles = []
 rootFolder="/home/ec2-user/environment/s3/sampleInventory" # which root folder has the inventory csv files
 MAX_INVENTORY_NUM = 1 # the max number of inventory files will be processed
 MAX_OBJ_TOTAL_NUM = 51 # the max number of objects will be processed
@@ -54,7 +49,7 @@ def set_log(LoggingLevel, this_file_name):
     log_path = Path(__file__).parent / 'amazon-s3-migration-log'
     if not Path.exists(log_path):
         Path.mkdir(log_path)
-    start_time = datetime.datetime.now().isoformat().replace(':', '-')[:19]
+    start_time = datetime.now().isoformat().replace(':', '-')[:19]
     _log_file_name = str(log_path / f'{this_file_name}-{start_time}.log')
     print('Log file:', _log_file_name)
     fileHandler = logging.FileHandler(filename=_log_file_name)
@@ -121,7 +116,7 @@ def pdDaskReadCSV(filePath):
     e_time = time.time() 
     print("Read using"+readerType+ ": ", (e_time-s_time), "seconds,with "+str(i+1)+" records") 
         
-def pdChunkRead(filePath):
+def pdChunkRead(filePath,azureEndpoint):
    # time taken to read data
     s_time = time.time()
     readerType = "Pandas Chunk Reader"
@@ -139,7 +134,7 @@ def pdChunkRead(filePath):
           _length = row['Content-Length']
           # begin to construct batch messages
           # SendMessage
-          job = _constructMsg(_name,_length,filePath)
+          job = _constructMsg(_name,_length,filePath,azureEndpoint)
           batchJobs.append({
                 "Id": str(totalCount),
                 "MessageBody": job,
@@ -177,7 +172,7 @@ def pdChunkRead(filePath):
     return {"TotalObjNum":totalCount,"TotalObjSize":totalSize}
 
 # 构建同步工具需要的消息格式
-def _constructMsg(objfile,size,inventoryCSVFile):
+def _constructMsg(objfile,size,inventoryCSVFile,endpoint):
     # job = {"file":objfile,"size":size}
     # get current datetime
     today = datetime.now(timezone.utc)
@@ -197,7 +192,7 @@ def _constructMsg(objfile,size,inventoryCSVFile):
                 "contentType": "N/A",
                 "contentLength":'''+str(size)+''',
                 "blobType": "BlockBlob",
-                "url": "'''+azure_storage_account+objfile+'''",
+                "url": "'''+endpoint+'''/'''+objfile+'''",
                 "sequencer": "N/A",
                 "storageDiagnostics": { "batchId": "N/A" }
               },
@@ -214,12 +209,11 @@ def parseManifest(manifestJsonPath,inventoryInfo):
             mf = json.load(dataFile)
             files = mf['files']
             total = len(files)
-            print("Total Inventory File #"+str(total))
-            if total > 0:
-                
-                for inventFileObj in files:
-                    fname = inventFileObj['blob']
-                    size = inventFileObj['size']
+            endpoint = mf['endpoint']
+            inventoryInfo['manifest'] = manifestJsonPath
+            inventoryInfo['azure_sa_endpoint'] = endpoint
+            inventoryInfo['inventory_files_num'] = total
+
     except FileNotFoundError:
         print("File Not Found!")
 
@@ -233,20 +227,35 @@ def parseManifest(manifestJsonPath,inventoryInfo):
 
 
 # get all maifest json files
+manifestFiles = []
 retriveFiles(rootFolder,manifestFiles,"/*-manifest.json")
 for f in manifestFiles:
     fobj = f[0]
+    inventoryInfo = {'inventory_files_num':0}
+    
+    # From Manifest to get Azure Blob Storage Endpoint
     parseManifest(fobj,inventoryInfo)
+    
+    numberOfInventoryFiles = inventoryInfo['inventory_files_num']
+    endpoint = inventoryInfo['azure_sa_endpoint']
+    manifestFilePath = inventoryInfo['manifest']
+    if numberOfInventoryFiles > 0:
+        pathOfMainiffest = manifestFilePath[:manifestFilePath.rindex("/")]
+        print(f"Begin to process its Inventory files of manifest {manifestFilePath}")
+        inventoryCSVFiles = []
+        retriveFiles(pathOfMainiffest,inventoryCSVFiles,"/*.csv")
 
-# Get all csv inventory files 
-retriveFiles(rootFolder,inventoryCSVFiles,"/*.csv")   
-i = 0
-for f in inventoryCSVFiles:
-    i = i + 1
-    print(f"Begin to processing file '{f[0]}'")
-    pdChunkRead(f[0])
+        i = 0
+        for f in inventoryCSVFiles:
+            i = i + 1        
+            print(f"Begin to processing file '{f[0]}'")
+            pdChunkRead(f[0],endpoint)
+            
+            if is_limit_debug and i >= MAX_INVENTORY_NUM:
+                break  
+        print(f"End to process its Inventory files of manifest {manifestFilePath}")
     if is_limit_debug and i >= MAX_INVENTORY_NUM:
-        break
+                break        
 
 
 
