@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from fnmatch import fnmatchcase
 from pathlib import PurePosixPath, Path
 from enum import Enum
+import pandas as pd
 import boto3
 
 logger = logging.getLogger()
@@ -37,7 +38,7 @@ def setLog(LoggingLevel, this_file_name):
     start_time = datetime.now().isoformat().replace(':', '-')[:19]
     _log_file_name = str(log_path / f'{this_file_name}-{start_time}.log')
     print('Log file:', _log_file_name)
-    fileHandler = handlers.RotatingFileHandler(filename=_log_file_name,maxBytes=52428800,backupCount=3)## 50MB each
+    fileHandler = handlers.RotatingFileHandler(filename=_log_file_name,maxBytes=52428800,backupCount=10)## 50MB each
     # fileHandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s - %(message)s'))
     logger.addHandler(fileHandler)
     return logger, _log_file_name
@@ -103,8 +104,8 @@ def constructSQSMsg(objfile,size,inventoryCSVFile,endpoint,et:AzureBlobEventType
 def retriveFiles(rootFolder,manifestFiles,pattern):
     folders = os.listdir(rootFolder)
     manifests = _findFiles(rootFolder,pattern)
-    if len(manifests) > 0:
-        manifestFiles.append(manifests)
+    for f in manifests:
+        manifestFiles.append(f)
         
     for d in os.listdir(rootFolder):
         fullDir = os.path.join(rootFolder,d)
@@ -113,14 +114,14 @@ def retriveFiles(rootFolder,manifestFiles,pattern):
 
 def _findFiles(root,pattern):
      manifests = glob.glob(root+pattern)
-    #  print(root)
-     manifestFiles = []
+     logger.info(root+pattern)
+     patternFiles = []
      if len(manifests) > 0:
         for mf in manifests:
             fullMf= os.path.join(root,mf)
-            manifestFiles.append(fullMf)
-            # print(fullMf) 
-     return manifestFiles    
+            patternFiles.append(fullMf)
+            logger.info(fullMf) 
+     return patternFiles    
     
 # # Get Blob Object Message Hash String in DDB
 # def checkMsgIdsFromDDB(table,fileName, saContainer, msgHashId):
@@ -188,3 +189,4 @@ def ddbBatchSaveMsgLogs(table, fileName, msgIds):
         # 日志写不了
         logger.error(f'Fail to put log to DDB - {str(e)}')
         return     
+
