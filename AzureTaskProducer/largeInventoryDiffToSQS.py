@@ -8,6 +8,8 @@ import os
 import pandas as pd
 import json
 from datetime import datetime, timezone
+import concurrent.futures
+import threading
 from inventory_lib import setLog, constructSQSMsg, AzureBlobEventType,retriveFiles,setAWSServices, \
      checkMsgIdsFromDDB,ddbBatchSaveMsgLogs
 
@@ -49,8 +51,12 @@ def pdChunkSplit(filePath):
             chunk.to_csv(name, sep=",")
     return diffInventory_path,diffInventoryArchive_path
 
-def pdChunkReadNew(filePath,sqs,archivePath):
-  # time taken to read data
+def pdChunkReadJob(is_local_debug,region,filePath,archivePath,logger):
+    sqs, ddb = setAWSServices(is_local_debug,region)
+    pdChunkReadNew(filePath,sqs,archivePath,logger)
+
+def pdChunkReadNew(filePath,sqs,archivePath,logger):
+    # time taken to read data
     s_time = time.time()
     readerType = "Pandas Chunk Reader"
 
@@ -108,7 +114,7 @@ def pdChunkReadNew(filePath,sqs,archivePath):
     
     logger.info(f"Read using {readerType} : {(e_time-s_time)} seconds,with {str(totalCount)} records and {totalSize} Bytes ")
     
-    return {"TotalObjNum":totalCount,"TotalObjSize":totalSize}
+    return str({"TotalObjNum":totalCount,"TotalObjSize":totalSize})
 
 def sendBatchSQS(sqs,batchJobs):
     hasException = False
@@ -120,6 +126,28 @@ def sendBatchSQS(sqs,batchJobs):
         hasException = True
         print(f'Fail to send sqs message: {str(batchJobs)}, {str(e)}') 
     return hasException, batchJobs
+
+# Process one job
+def jobProcessor(is_local_debug,region, splittedFiles, archivePath,logger, MaxThread=10):
+    def workerDoneCallBack(future):
+        result = future.result()
+        logger.infor(result)
+
+    # 处理主流程，通过线程池并行处理清单差异切割出来的小文件
+    try:
+        stop_signal = threading.Event()  # 用于JobTimeout终止当前文件的所有线程
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MaxThread) as pool:
+            # 提交处理每个文件的线程
+            allJobs = [pool.submit(pdChunkReadJob,is_local_debug,region,f,archivePath,logger).add_done_callback(workerDoneCallBack) for f in diffInventoryCSVFiles]
+            # for f in diffInventoryCSVFiles:
+            #     pool.submit(pdChunkReadNew,sqs,f,archivePath).add_done_callback(workerDoneCallBack)
+            concurrent.futures.wait(allJobs, timeout=300,return_when="ALL_COMPLETED")
+
+    except Exception as e:
+        logger.error(f'Exception in job_processor: {str(e)}')
+        return "ERR"
+    return "SUCCESS"
+
 
 LoggingLevel = 'INFO'
 
@@ -140,15 +168,18 @@ if __name__ == '__main__':
     i = 0
     s_time = time.time()
     print(f"Total Splitted Inventory Files# {len(diffInventoryCSVFiles)}")
-    for f in diffInventoryCSVFiles:
-        i = i + 1        
-        print(f"Begin to processing file '{f}'")
+    
+    jobProcessor(is_local_debug,region, diffInventoryCSVFiles, archivePath,logger)
+    
+    # for f in diffInventoryCSVFiles:
+    #     i = i + 1        
+    #     print(f"Begin to processing file '{f}'")
         
-        pdChunkReadNew(f,sqs,archivePath)
+    #     pdChunkReadNew(f,sqs,archivePath)
                 
-        if is_limit_debug and i >= MAX_INVENTORY_NUM:
-            break  
-        print(f"End to process Azure Inventory Difference File {f}")
+    #     if is_limit_debug and i >= MAX_INVENTORY_NUM:
+    #         break  
+    #     print(f"End to process Azure Inventory Difference File {f}")
         
     e_time = time.time() 
     print(f"End to process Azure Inventory Difference Files {(e_time-s_time)} seconds")
