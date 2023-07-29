@@ -21,7 +21,7 @@ sqs_queue = "https://sqs.us-east-2.amazonaws.com/188869792837/recode_msg_test"
 # ddb_table = "inventoryMsgTable"
 
 # global variables
-inventoryDiffFile="/home/ec2-user/environment/s3/diffInventory/sample_update.csv" # which root folder has the inventory diff csv files
+inventoryDiffFile="/home/ec2-user/environment/s3/diffInventory/cep1prod1abcdw-cep1prod1abcdw-20230718-20230724-add.csv" # which root folder has the inventory diff csv files
 MAX_INVENTORY_NUM = 1 # the max number of inventory files will be processed
 MAX_OBJ_TOTAL_NUM = 8 # the max number of objects will be processed
 MAX_OBJ_TOTAL_SIZE = 1024 # GB, the max accumulated obj size will be processed
@@ -177,13 +177,15 @@ def jobProcessor(is_local_debug,region, splittedFiles, archivePath,logger, MaxTh
 
     # 处理主流程，通过线程池并行处理清单差异切割出来的小文件
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=MaxThread) as pool:
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=MaxThread) as pool:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MaxThread) as pool:
             s_time = time.time()
             # 提交处理每个文件的线程
             allJobs = [pool.submit(pdChunkReadJob,is_local_debug,region,f,archivePath,logger).add_done_callback(workerDoneCallBack) for f in splittedFiles]
             # for f in diffInventoryCSVFiles:
             #     pool.submit(pdChunkReadNew,sqs,f,archivePath).add_done_callback(workerDoneCallBack)
-            concurrent.futures.wait(allJobs, return_when="ALL_COMPLETED")
+            # concurrent.futures.wait(allJobs, return_when="ALL_COMPLETED")
+            pool.shutdown(wait=True)
             e_time = time.time()
             logger.infor("Time to Tread Pool process all {len(splittedFiles)} files and Send to SQS using {(e_time-s_time)/60} minutes")
 
@@ -213,9 +215,9 @@ if __name__ == '__main__':
     s_time = time.time()
     print(f"Total Splitted Inventory Files# {len(diffInventoryCSVFiles)}")
     
-    jobProcessor(is_local_debug,region, diffInventoryCSVFiles, archivePath,logger)
+    jobProcessor(is_local_debug,region, diffInventoryCSVFiles, archivePath,logger,38)
         
     e_time = time.time() 
-    print(f"End to process the large file {inventoryDiffFile}, Total Number#{{len(diffInventoryCSVFiles)}} using {(e_time-s_time)} seconds")
+    print(f"End to process the large file {inventoryDiffFile}, Total Number#{len(diffInventoryCSVFiles)} using {(e_time-s_time)} seconds")
 
 
