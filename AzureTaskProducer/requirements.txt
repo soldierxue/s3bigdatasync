@@ -1,0 +1,6 @@
+# The python script requires following libraries, You need to install these with
+# `pip3 install -r requirements.txt --user` before you can run this.
+# python>=3.7.16
+
+boto3>=1.28.0
+pandas>=1.3.5
