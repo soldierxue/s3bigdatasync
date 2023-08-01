@@ -1,0 +1,12 @@
+INIT_WORKERS = 10
+MAX_WORKERS = 40
+UPDATE_INTERVAL = 0.5 # 500ms
+DRY_RUN = False
+PID = './etag_checker.pid'
+BLOB_CONN_STR = ""
+BLOB_PROPS_DOUBLE_CHECK = True
+INPUT_CHUNK_SIZE = 100
+OUTPUT_SUCCESS_PREFIX = 'success_'
+OUTPUT_ERRORS_PREFIX = 'errors_'
+OUTPUT_CSV_HEADER = '"StorageAccount","ContainerName","BlobName","S3Bucket","S3Key","ProcessTime","TimeCost","Message"\n'
+TASK_QUEUE_HIGH_WATERMARK = 1000
